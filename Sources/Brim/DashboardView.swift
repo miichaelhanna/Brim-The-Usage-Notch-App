@@ -9,6 +9,7 @@ import BrimCore
 /// own, and every colour comes from the appearance rather than from a fixed palette.
 enum DashboardPage: String, CaseIterable, Identifiable {
     case overview = "Usage"
+    case time = "Time"
     case connections = "Connections", appearance = "Notch", roadmap = "Roadmap"
 
     var id: String { rawValue }
@@ -16,6 +17,7 @@ enum DashboardPage: String, CaseIterable, Identifiable {
     var symbol: String {
         switch self {
         case .overview: "chart.bar.fill"
+        case .time: "calendar"
         case .connections: "link"
         case .appearance: "macbook"
         case .roadmap: "signpost.right.fill"
@@ -27,6 +29,7 @@ enum DashboardPage: String, CaseIterable, Identifiable {
     var tint: Color {
         switch self {
         case .overview: .blue
+        case .time: .pink
         case .connections: .green
         case .appearance: .indigo
         case .roadmap: .orange
@@ -76,6 +79,7 @@ struct StatusChip: View {
 struct DashboardView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var navigation: NavigationState
+    @ObservedObject var activity: ActivityStore
 
     var body: some View {
         if navigation.showWelcome {
@@ -137,6 +141,7 @@ struct DashboardView: View {
         Group {
             switch navigation.page {
             case .overview: overview
+            case .time: TimeView(store: store, activity: activity)
             case .connections: ConnectionsView(store: store)
             case .appearance: AppearanceView(store: store)
             case .roadmap: RoadmapView()

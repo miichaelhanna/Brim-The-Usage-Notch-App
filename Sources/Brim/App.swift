@@ -29,6 +29,7 @@ enum BrimApp {
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     let store = UsageStore()
+    let activity = ActivityStore()
     let navigation = NavigationState()
     private var window: NSWindow?
     private var notch: NotchController?
@@ -58,6 +59,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             }
             connection.onError = { message in fputs("Codex: \(message)\n", stderr); connection.stop(); exit(1) }
             connection.refresh(executable: CodexConnection.findExecutable())
+            return
+        }
+        // `--activity-time`: prints the last fortnight of time per tool and exits.
+        //
+        // The calendar is built from gigabytes of transcripts on a real Mac and from a
+        // handful of fixtures in the tests, and only this shows what the method makes
+        // of an actual working month. Reading is the whole of what it does, exactly as
+        // the view does it, so what it prints is what the view will show.
+        if CommandLine.arguments.contains("--activity-time") {
+            Task { @MainActor in
+                let calendar = Calendar.current
+                let report = await ActivityStore.report(days: 14, calendar: calendar)
+                print(report)
+                NSApp.terminate(nil)
+            }
             return
         }
         setupMenu()
@@ -118,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool { showDashboard(); return true }
-    func applicationWillTerminate(_ notification: Notification) { store.stop(); diagnostic?.stop(); notch?.stop() }
+    func applicationWillTerminate(_ notification: Notification) { store.stop(); activity.stop(); diagnostic?.stop(); notch?.stop() }
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
 
     private func setupMenu() {
@@ -305,7 +321,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             // Hosted as a content *view controller*, not a content view: that is what
             // lets SwiftUI install the window's toolbar and give the sidebar its
             // material, which is most of what makes this look like a Mac app.
-            let controller = NSHostingController(rootView: DashboardView(store: store, navigation: navigation))
+            let controller = NSHostingController(rootView: DashboardView(store: store, navigation: navigation, activity: activity))
             let window = NSWindow(contentViewController: controller)
             window.styleMask = [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView]
             window.title = "Brim"
