@@ -36,8 +36,9 @@ final class ClaudeLiveConnection {
                 "No Claude Code login was found on this Mac. Sign in with Claude Code and live "
                     + "usage turns on by itself."
             case .credentialExpired:
-                "Claude Code’s saved login has lapsed. It renews the next time you use Claude "
-                    + "Code, and live usage resumes on its own."
+                "Claude Code’s saved login has lapsed. Only Claude Code can renew it, and running "
+                    + "the `claude` command once does: Brim sees the new login and goes live again "
+                    + "by itself, within seconds."
             case .rejected:
                 "Anthropic rejected Claude Code’s saved login. Signing in again with Claude Code "
                     + "replaces it."

@@ -62,13 +62,14 @@ One ring per allowance. Claude and Claude Code draw on the same subscription, an
 ChatGPT and Codex on the same Work allowance, so each pair is one ring rather than two
 rings showing the same number.
 
-| Ring | Covers | Where the numbers come from |
+| Shows | Covers | Where the numbers come from |
 |---|---|---|
 | **Claude** | Claude and Claude Code | Anthropic's usage endpoint, read with the login Claude Code already keeps on this Mac. Until macOS lets it read that login, it falls back to Claude Code's local cache. |
 | **ChatGPT** | ChatGPT and Codex | Asks the ChatGPT app's own bundled engine. Brim never handles an OpenAI token. |
+| **Perplexity** | The Perplexity Mac app | The preferences that app already writes. Counts rather than a ring, see below. |
 
-Both start disconnected. Brim lists only tools it can actually read, and reads none of
-them until you press Connect on that row, in the first-run screen or in Connections.
+All three start disconnected. Brim lists only tools it can actually read, and reads none
+of them until you press Connect on that row, in the first-run screen or in Connections.
 
 <p align="center">
   <img src="Docs/Screenshots/first-run.png" alt="The first-run screen, listing what was found on this Mac with a Connect button on each row" width="620">
@@ -83,6 +84,14 @@ those can be added, see [Contributing](#contributing).
 **On ChatGPT:** the figure shown is the *Work* allowance, which Codex meters too.
 Regular Chat and Voice limits are not included, and are not available locally. The app
 labels this rather than quietly presenting it as your whole ChatGPT usage.
+
+**On Perplexity:** it gets a count, not a ring. Perplexity records how many goes are
+left — "4 Pro searches" — and never how many there were to begin with, and that number
+is nowhere on the Mac. A ring is a proportion, and drawing one would mean inventing the
+allowance to divide by. So Brim shows the number Perplexity actually gave. A mode
+Perplexity marks unavailable reads as *Unavailable* rather than as zero, because the
+file says the same thing whether the mode was never on your plan or you have just used
+the last one.
 
 ## Live Claude updates
 

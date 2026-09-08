@@ -26,6 +26,8 @@ struct ProviderMark: View {
                 BrandGlyph(data: BrandMarks.openai).fill(tint)
             case .codex:
                 CodexMark().fill(tint, style: FillStyle(eoFill: true))
+            case .perplexity:
+                BrandGlyph(data: BrandMarks.perplexity).fill(tint)
             }
         }.frame(width: Self.width(of: provider, size: size), height: size).accessibilityHidden(true)
     }

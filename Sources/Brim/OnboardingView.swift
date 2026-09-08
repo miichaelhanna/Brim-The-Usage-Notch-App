@@ -137,7 +137,7 @@ struct OnboardingView: View {
 
     private var approvalSection: some View {
         section("What happens when you switch one on") {
-            ConnectApprovalPreview()
+            ConnectApprovalPreview(tools: found)
         }
     }
 

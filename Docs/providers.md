@@ -81,6 +81,45 @@ everywhere it appears; please keep that if you touch this code.
 gets misread as a sign-out. Requests carry a 20-second timeout and a generation guard,
 so a reply from a killed process cannot alter state.
 
+## Perplexity
+
+**A count, not a ring.** Perplexity reports how many goes are left in each mode and
+never how many there were. The allowance is not in the file, not in the app's caches,
+not in its group containers, and not in its cached models config — it is simply not on
+the machine. So this provider produces `UsageCount` values rather than `UsageWindow`s,
+and the interface shows "4 left" beside an unfilled ring instead of a percentage.
+
+Please keep it that way. Picking a denominator — the published free-tier figure, a
+high-water mark of what has been observed — would mean inventing the one number
+Perplexity declines to give, and every other reading in this app would then be sitting
+next to a guess.
+
+**Source.** `~/Library/Preferences/ai.perplexity.macv3.plist`, key `remainingUsage`.
+It is a binary plist whose value is a *string* of JSON, so it decodes twice: once as a
+plist, once as JSON out of that string. This is why Perplexity cannot be a described
+tool (see [add-a-tool.md](add-a-tool.md)) — a descriptor reads one local JSON file, and
+this is neither JSON nor singly encoded.
+
+```json
+{"modes":{"pro_search":{"available":true,"remaining_detail":{"remaining":4,"kind":"exact"}}},
+ "free_queries":{"remaining_detail":{"kind":"not_provided"},"available":true}}
+```
+
+`kind` is the field that matters: only `exact` carries a number, and anything else means
+Perplexity is not saying, so that mode is left out rather than shown as none left.
+
+**Unavailable is not zero.** A mode with `available: false` gets no number. Perplexity
+reports "never on your plan" and "you have just used the last one" identically, both as
+an unavailable zero, so neither claim is made.
+
+**Staleness.** macOS buffers preference writes in `cfprefsd`, so the file can trail the
+running app by up to a flush. The snapshot therefore carries the file's own modification
+date, never the time it was read, and a reading a few minutes old says so.
+
+**No usage link.** Perplexity's app registers a scheme, but no destination that lands on
+usage has been verified, so `desktopUsageRoute` is nil and the link is hidden. If you
+verify one, that is a small and welcome pull request.
+
 ## Not yet supported
 
 Brim lists only the tools it can read. Earlier builds also detected tools they could
@@ -90,7 +129,6 @@ lives here instead, as the contributions most worth making.
 | Tool | What is known |
 |---|---|
 | **Antigravity** | Its quota lives behind gRPC/Connect calls (`RetrieveUserQuotaSummary`, `FetchQuotaStatus`) to `cloudcode-pa.googleapis.com`, with a Keychain-only credential. Reading it means protobuf framing and a credential prompt. Possible, but a project in itself. |
-| **Perplexity** | Writes no usage anywhere on this Mac, so there is nothing to read. Earlier versions let you type a percentage in by hand; that was removed, because a figure typed once is wrong within the hour and made the honest readings beside it look like guesses too. |
 | **Cursor**, **Grok**, **OpenCode**, **GLM** | Unknown. If any of them keeps its usage in a local JSON file, it needs no adapter at all. Describe it (see [add-a-tool.md](add-a-tool.md)) and open a pull request with the description. These are the best first contributions. |
 
 ---

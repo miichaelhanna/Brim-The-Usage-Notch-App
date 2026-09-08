@@ -31,8 +31,18 @@ public extension Provider {
             // meters the same Work allowance, which is why the bug survived review.
             return DesktopUsageRoute(bundleIdentifier: "com.openai.codex",
                                      url: URL(string: "codex://settings/usage")!, minimumVersion: "26.901.51231")
+        case .perplexity:
+            // No route, because none has been verified. Perplexity's Mac app does
+            // register a scheme, but nothing here has confirmed a destination that
+            // lands on usage, and a link that opens the app at some arbitrary place
+            // is worse than no link at all. The counts are in Brim either way.
+            return nil
         }
     }
+
+    /// Whether there is a page to send someone to. A provider with no verified route
+    /// shows no link, rather than a link that quietly lands somewhere else.
+    var hasUsageLink: Bool { desktopUsageRoute != nil }
 
     var usageLinkHint: String { "Open \(name)’s own usage page" }
 }

@@ -79,6 +79,10 @@ final class UsageStore: ObservableObject {
     private let claudeSignIn = ClaudeSignInConnection()
     private let claudeReader = ClaudeUsageReader()
     private let claudeLive = ClaudeLiveConnection()
+    /// Watches for Claude Code writing a new login while the one Brim read has lapsed.
+    private var renewal = CredentialRenewal()
+    private var lastRenewalCheck: Date?
+    private let perplexity = PerplexityReader()
     private var liveUnavailable: ClaudeLiveConnection.Unavailable?
     private var timer: Timer?
     private let refreshPolicy = RefreshPolicy()
@@ -206,6 +210,29 @@ final class UsageStore: ObservableObject {
             self.recordOutcome(.claudeCode, succeeded: false)
             self.endRefreshing(AccountSignIn.claudeProviders.map(\.rawValue))
         }
+        // Perplexity has no sign-in to interrogate, so a usable reading is the only
+        // evidence there is that an account is behind it. Absent means the app is
+        // there and has recorded nothing, which is what a signed-out Perplexity is.
+        perplexity.onSnapshot = { [weak self] snapshot in
+            guard let self else { return }
+            self.snapshots[.perplexity] = snapshot
+            self.errors[.perplexity] = nil
+            self.updateSignIn([.perplexity], family: [.perplexity])
+            self.endRefreshing([Provider.perplexity.rawValue])
+            self.persistReadings()
+        }
+        perplexity.onAbsent = { [weak self] in
+            guard let self else { return }
+            self.errors[.perplexity] = nil
+            self.updateSignIn([], family: [.perplexity])
+            self.endRefreshing([Provider.perplexity.rawValue])
+        }
+        perplexity.onFailure = { [weak self] message in
+            guard let self else { return }
+            self.errors[.perplexity] = message
+            self.checkedProviders.insert(.perplexity)
+            self.endRefreshing([Provider.perplexity.rawValue])
+        }
         claudeReader.onAbsent = { [weak self] in self?.claudeAccountUUID = nil }
         claudeReader.onFailure = { [weak self] message in
             for provider in [Provider.claude, .claudeCode] { self?.errors[provider] = message }
@@ -233,6 +260,8 @@ final class UsageStore: ObservableObject {
         now = Date()
         // Cheap: these only re-parse when a file's modification date changed.
         readClaudeUsage()
+        noticeRenewedClaudeLogin()
+        readPerplexity()
         readDescribedTools()
         pollAccounts(force: false)
     }
@@ -252,6 +281,7 @@ final class UsageStore: ObservableObject {
         noteActivity()
         now = Date()
         readClaudeUsage()
+        readPerplexity()
         readDescribedTools()
         pollAccounts(force: false)
     }
@@ -271,6 +301,26 @@ final class UsageStore: ObservableObject {
 
     func headline(_ tool: TrackedTool) -> UsageWindow? { reading(tool)?.headline(at: now) }
 
+    /// What the notch shows beside a tool's ring.
+    ///
+    /// A percentage wherever there is one. Where the provider reports counts instead
+    /// there is no percentage to be had, so the count goes there bare, with no `%`,
+    /// beside a ring left unfilled: the one thing it must not be mistaken for is a
+    /// proportion. A tool reporting several counts shows the smallest, on the same
+    /// principle as `headline` — the number worth seeing is the one about to stop you.
+    func glanceValue(_ tool: TrackedTool) -> String? {
+        if let window = headline(tool) { return "\(Int(window.usedPercent.rounded()))%" }
+        guard let fewest = reading(tool)?.counts.compactMap(\.remaining).min() else { return nil }
+        return "\(fewest)"
+    }
+
+    /// The same thing said out loud, where "4" alone would mean nothing.
+    func glanceDescription(_ tool: TrackedTool) -> String {
+        if let window = headline(tool) { return "\(Int(window.usedPercent.rounded())) percent used" }
+        guard let fewest = reading(tool)?.counts.compactMap(\.remaining).min() else { return status(tool) }
+        return "\(fewest) left"
+    }
+
     func error(_ tool: TrackedTool) -> String? {
         if let provider = tool.builtin { return errors[provider] }
         return describedTools.first { $0.tool.id == tool.id }?.error
@@ -280,7 +330,8 @@ final class UsageStore: ObservableObject {
         if let provider = tool.builtin { return status(provider) }
         if error(tool) != nil { return "Unavailable" }
         guard let reading = reading(tool) else { return "Waiting for a reading" }
-        if reading.primary(at: now) == nil { return "Awaiting update" }
+        guard reading.hasReading else { return "Awaiting update" }
+        if !reading.windows.isEmpty, reading.primary(at: now) == nil { return "Awaiting update" }
         return reading.isStale(at: now) ? "Last known" : "Connected"
     }
 
@@ -293,6 +344,10 @@ final class UsageStore: ObservableObject {
         switch provider {
         case .claude, .claudeCode: return claudeSourceMessage
         case .chatgpt, .codex: return "Connect the ChatGPT app’s sign-in to read the Work allowance that ChatGPT and Codex share, refreshed automatically."
+        case .perplexity:
+            return "Connect Perplexity to read what its Mac app has left. Sign in to Perplexity "
+                + "and run a search if this stays empty: the app writes nothing until it has "
+                + "something to record."
         }
     }
 
@@ -302,9 +357,10 @@ final class UsageStore: ObservableObject {
     /// and Codex and ChatGPT share the Work allowance, so refreshing either of a pair
     /// has to light both, otherwise one ring sits still while its own number moves.
     private func feedbackIDs(for provider: Provider) -> [String] {
-        let family = AccountSignIn.claudeProviders.contains(provider)
-            ? AccountSignIn.claudeProviders : AccountSignIn.openAIProviders
-        return family.map(\.rawValue)
+        if AccountSignIn.claudeProviders.contains(provider) { return AccountSignIn.claudeProviders.map(\.rawValue) }
+        if AccountSignIn.openAIProviders.contains(provider) { return AccountSignIn.openAIProviders.map(\.rawValue) }
+        // A provider that shares its allowance with nothing lights only its own ring.
+        return [provider.rawValue]
     }
 
     /// Show a ring as busy from the moment it is clicked.
@@ -385,7 +441,10 @@ final class UsageStore: ObservableObject {
             }
             return "Not connected"
         }
-        if snapshot.primary(at: now) == nil { return "Awaiting update" }
+        guard snapshot.hasReading else { return "Awaiting update" }
+        // Only windows expire. A count carries no reset time, so there is no moment
+        // at which it becomes due rather than merely old, and staleness alone says it.
+        if !snapshot.windows.isEmpty, snapshot.primary(at: now) == nil { return "Awaiting update" }
         if snapshot.isStale(at: now) { return "Last known" }
         return "Connected"
     }
@@ -396,6 +455,7 @@ final class UsageStore: ObservableObject {
         described.reset()
         readDescribedTools(force: true)
         refreshClaudeUsage()
+        refreshPerplexity()
         pollAccounts(force: true)
     }
 
@@ -407,6 +467,7 @@ final class UsageStore: ObservableObject {
         switch provider {
         case .claude, .claudeCode: refreshClaudeUsage()
         case .codex, .chatgpt: pollCodex(force: true)
+        case .perplexity: refreshPerplexity()
         }
     }
 
@@ -502,6 +563,9 @@ final class UsageStore: ObservableObject {
         switch tool {
         case .codex: codex.login(executable: executable)
         case .claudeCode: claudeSignIn.refresh(); enableLiveClaude()
+        // Nothing to launch and nothing to sign in to: the app has already written
+        // what it knows, and this is the consent to open that file.
+        case .perplexity: refreshPerplexity()
         }
     }
 
@@ -516,6 +580,9 @@ final class UsageStore: ObservableObject {
         case .claudeCode:
             claudeSignIn.stop(); claudeLive.stop()
             liveClaude = .off; liveUnavailable = nil
+            renewal.reset(); lastRenewalCheck = nil
+        case .perplexity:
+            perplexity.reset()
         }
         updateSignIn([], family: Set(tool.providers))
         // Not "checked and signed out": not asked at all, which is what the row says.
@@ -540,6 +607,44 @@ final class UsageStore: ObservableObject {
     func readClaudeUsage() {
         guard signedInProviders.contains(.claudeCode) else { claudeReader.reset(); return }
         claudeReader.refresh()
+    }
+
+    /// Picks a lapsed login back up as soon as Claude Code replaces it.
+    ///
+    /// Brim cannot renew that login and must not try: two processes writing one
+    /// rotating credential is how people get silently signed out. So it waits — and
+    /// waiting was the problem. The backoff after a failure doubles to half an hour, so
+    /// someone who signed in again could sit in front of an orange row for that long
+    /// while the login it complained about was already valid, which made the row a lie
+    /// of a slower kind than the one it replaced.
+    ///
+    /// Watching costs nothing, because the evidence is a date rather than a secret. The
+    /// Keychain will say when an item was last written without being asked for what is
+    /// in it, so this raises no permission prompt however often it runs. A new date
+    /// means a new login, which has earned the attempt the old one's failures took
+    /// away.
+    private func noticeRenewedClaudeLogin() {
+        guard isConnected(.claudeCode), case .problem = liveClaude else { return }
+        // Not on every five second tick: this walks every generic password on the Mac,
+        // and nobody signs in twice in fifteen seconds.
+        if let last = lastRenewalCheck, now.timeIntervalSince(last) < 15 { return }
+        lastRenewalCheck = now
+        guard renewal.noticed(ClaudeCredential.lastChanged()) else { return }
+        refreshStates[.claudeCode] = ProviderRefreshState(lastAttempt: now)
+        persistRefreshStates()
+        liveClaude = .checking
+        claudeLive.refresh()
+    }
+
+    /// Forces a re-read even when the preferences have not changed.
+    func refreshPerplexity() {
+        perplexity.reset()
+        readPerplexity()
+    }
+
+    func readPerplexity() {
+        guard isConnected(.perplexity) else { perplexity.reset(); return }
+        perplexity.refresh()
     }
 
     /// Asks for live Claude usage now.

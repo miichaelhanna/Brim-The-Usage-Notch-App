@@ -98,6 +98,26 @@ enum ClaudeCredential {
         return .missing
     }
 
+    /// When Claude Code last wrote a login, without reading one.
+    ///
+    /// Attributes only, exactly like the first phase of `look`: no secret is touched,
+    /// so this needs no permission and raises no prompt. That is what lets it run on a
+    /// timer while a lapsed login is on screen, which reading the token could not.
+    static func lastChanged() -> Date? {
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecMatchLimit as String: kSecMatchLimitAll,
+            kSecReturnAttributes as String: true
+        ]
+        var found: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &found) == errSecSuccess,
+              let items = found as? [[String: Any]] else { return nil }
+        return items
+            .filter { ($0[kSecAttrService as String] as? String)?.hasPrefix(servicePrefix) ?? false }
+            .compactMap { $0[kSecAttrModificationDate as String] as? Date }
+            .max()
+    }
+
     static func parse(_ data: Data) -> Token? {
         guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         let oauth = root["claudeAiOauth"] as? [String: Any] ?? root

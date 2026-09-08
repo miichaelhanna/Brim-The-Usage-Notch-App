@@ -2,6 +2,50 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## 1.2.0 (2026-09-09)
+
+A fourth tool to read, a Claude login that repairs itself, and the first-run screen
+saying what each tool actually asks of you.
+
+### Perplexity
+
+- **Perplexity is now one of the tools Brim can read**, from the preferences its Mac app
+  already writes. No API key, no second login, and nothing read until Connect is pressed
+  on that row, the same as every other tool here.
+- **A count, not a ring.** Perplexity reports how many goes are left and never how many
+  there were, and that allowance is nowhere on the Mac. So the notch shows the number
+  itself, beside a ring left unfilled, and the card reads "4 left". Choosing a
+  denominator would have meant inventing the one figure Perplexity declines to give.
+- A mode Perplexity marks unavailable reads as *Unavailable*, not as zero. The file
+  reports "never on your plan" and "you have used the last one" identically, so neither
+  claim gets made.
+- No usage deep link, because none has been verified. The link is hidden rather than
+  pointed at a page that might not exist, and the counts are in Brim either way.
+
+### Claude
+
+- **A lapsed Claude login is waited out rather than hammered.** Brim now notices when
+  Claude Code writes a fresh credential and retries then, backing off in between instead
+  of asking again every cycle. The renewal logic has tests; the end-to-end recovery has
+  not been watched happen, because provoking it needs a genuinely expired credential.
+- One message about a failed Claude read, where two could previously contradict
+  each other.
+
+### First run
+
+- **The keychain approval is shown before it appears**, drawn at the size and wording
+  macOS uses, so the box is recognised rather than met cold. The useful button is not
+  the default one, and someone seeing it for the first time reads Deny as the safe
+  answer and ends up with an app that never reads anything.
+- Each detected tool now says what switching it on actually does. Only Claude Code
+  raises a permission box; ChatGPT, Codex and Perplexity are read from files they
+  already keep, and saying so stops the other two looking like they need approving.
+
+### Window
+
+- The sidebar runs Notch, Connections, Usage, Time, Roadmap, and the window opens on
+  Notch rather than on whatever was selected last.
+
 ## 1.1.0 (2026-09-09)
 
 Where the week went, a notch sized to the screen it is on, and two things that were

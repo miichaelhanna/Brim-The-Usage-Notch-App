@@ -67,22 +67,29 @@ public struct TrackedTool: Identifiable, Hashable, Sendable {
 /// The views want the same four things from either, so they take this.
 public struct ToolReading: Equatable, Sendable {
     public var windows: [UsageWindow]
+    /// Allowances reported as a count rather than a proportion. See `UsageCount`:
+    /// a provider that will not say what the allowance was cannot be drawn as a ring.
+    public var counts: [UsageCount]
     public var sourceLabel: String
     public var updatedAt: Date
     /// How long a reading from this source stays current. Beyond it, the app says
     /// "last known" rather than implying the number is live.
     public var freshFor: TimeInterval
-    public init(windows: [UsageWindow], sourceLabel: String, updatedAt: Date,
-                freshFor: TimeInterval = 600) {
-        self.windows = windows; self.sourceLabel = sourceLabel
+    public init(windows: [UsageWindow], counts: [UsageCount] = [], sourceLabel: String,
+                updatedAt: Date, freshFor: TimeInterval = 600) {
+        self.windows = windows; self.counts = counts; self.sourceLabel = sourceLabel
         self.updatedAt = updatedAt; self.freshFor = freshFor
     }
 
     public init(_ snapshot: UsageSnapshot) {
-        self.init(windows: snapshot.windows, sourceLabel: snapshot.source.label,
+        self.init(windows: snapshot.windows, counts: snapshot.counts,
+                  sourceLabel: snapshot.source.label,
                   updatedAt: snapshot.updatedAt,
                   freshFor: snapshot.source == .manual ? 86400 : 600)
     }
+
+    /// Whether this reading says anything at all, in either shape.
+    public var hasReading: Bool { !windows.isEmpty || !counts.isEmpty }
 
     public func primary(at now: Date = Date()) -> UsageWindow? {
         windows.first { !$0.hasExpired(at: now) }

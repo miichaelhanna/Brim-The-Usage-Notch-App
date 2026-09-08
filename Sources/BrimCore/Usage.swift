@@ -2,12 +2,12 @@ import Foundation
 
 /// A source this app knows how to read.
 ///
-/// Four sources, two allowances: Claude and Claude Code draw on one subscription, and
-/// ChatGPT and Codex on one Work allowance. Readings are still tracked per source,
-/// because they arrive from different places and a reading has to say where it came from,
-/// but each pair is shown once, under `displayProvider`.
+/// Five sources, three allowances: Claude and Claude Code draw on one subscription,
+/// ChatGPT and Codex on one Work allowance, and Perplexity stands alone. Readings are
+/// still tracked per source, because they arrive from different places and a reading
+/// has to say where it came from, but each pair is shown once, under `displayProvider`.
 public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
-    case claude, chatgpt, codex, claudeCode
+    case claude, chatgpt, codex, claudeCode, perplexity
     public var id: String { rawValue }
     public var name: String {
         switch self {
@@ -15,6 +15,7 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
         case .chatgpt: "ChatGPT"
         case .codex: "Codex"
         case .claudeCode: "Claude Code"
+        case .perplexity: "Perplexity"
         }
     }
     /// The provider whose ring stands for this one. A pair sharing an allowance would
@@ -24,7 +25,7 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
         switch self {
         case .claudeCode: .claude
         case .codex: .chatgpt
-        case .claude, .chatgpt: self
+        case .claude, .chatgpt, .perplexity: self
         }
     }
     public var isDisplayed: Bool { displayProvider == self }
@@ -36,6 +37,10 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
         switch displayProvider {
         case .claude: "Claude and Claude Code draw on this one allowance."
         case .chatgpt: "ChatGPT and Codex draw on this one Work allowance. Regular Chat and Voice limits are not included."
+        // The one place this is said in full. Perplexity publishes what is left and
+        // never the allowance, so there is no percentage to be had and the app shows
+        // the count it was actually given.
+        case .perplexity: "Perplexity reports how many goes are left, never how many there were, so these are counts rather than a percentage."
         default: nil
         }
     }
@@ -45,6 +50,7 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
         case .chatgpt: "ChatGPT and Codex"
         case .codex: "Build without surprises"
         case .claudeCode: "Keep your flow going"
+        case .perplexity: "Search and research modes"
         }
     }
     public var accountURL: URL {
@@ -53,6 +59,7 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
         // The Work allowance is the one Codex meters, so its page is the one that
         // shows the number Brim shows.
         case .chatgpt, .codex: "https://chatgpt.com/codex/settings/usage"
+        case .perplexity: "https://www.perplexity.ai/account/details"
         }
         return URL(string: address)!
     }
@@ -108,7 +115,7 @@ public struct UsageWindow: Codable, Identifiable, Equatable, Sendable {
 }
 
 public enum UsageSource: String, Codable, Sendable {
-    case codex, chatgptWork, claudeBridge, claudeCache, claudeLive, manual
+    case codex, chatgptWork, claudeBridge, claudeCache, claudeLive, manual, perplexityApp
     public var label: String {
         switch self {
         case .codex: "Live · Codex"
@@ -117,6 +124,7 @@ public enum UsageSource: String, Codable, Sendable {
         case .claudeCache: "Claude Code cache"
         case .claudeLive: "Live · Claude"
         case .manual: "Manual entry"
+        case .perplexityApp: "Read from the Perplexity app"
         }
     }
 }
@@ -124,13 +132,33 @@ public enum UsageSource: String, Codable, Sendable {
 public struct UsageSnapshot: Codable, Equatable, Sendable {
     public var provider: Provider
     public var windows: [UsageWindow]
+    /// Allowances the provider reports as a count rather than as a proportion. Only
+    /// ever populated instead of `windows`, never alongside them: a provider that
+    /// gives a percentage is drawn as a ring.
+    public var counts: [UsageCount]
     public var source: UsageSource
     public var updatedAt: Date
     public var plan: String?
-    public init(provider: Provider, windows: [UsageWindow], source: UsageSource, updatedAt: Date = Date(), plan: String? = nil) {
-        self.provider = provider; self.windows = windows; self.source = source
-        self.updatedAt = updatedAt; self.plan = plan
+    public init(provider: Provider, windows: [UsageWindow], counts: [UsageCount] = [],
+                source: UsageSource, updatedAt: Date = Date(), plan: String? = nil) {
+        self.provider = provider; self.windows = windows; self.counts = counts
+        self.source = source; self.updatedAt = updatedAt; self.plan = plan
     }
+
+    /// Readings saved before counts existed decode without the key, and a cache
+    /// written by an older build must keep working rather than being thrown away.
+    public init(from decoder: any Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        provider = try container.decode(Provider.self, forKey: .provider)
+        windows = try container.decode([UsageWindow].self, forKey: .windows)
+        counts = try container.decodeIfPresent([UsageCount].self, forKey: .counts) ?? []
+        source = try container.decode(UsageSource.self, forKey: .source)
+        updatedAt = try container.decode(Date.self, forKey: .updatedAt)
+        plan = try container.decodeIfPresent(String.self, forKey: .plan)
+    }
+
+    /// Whether this reading says anything at all, in either shape.
+    public var hasReading: Bool { !windows.isEmpty || !counts.isEmpty }
     public func primary(at now: Date = Date()) -> UsageWindow? { windows.first { !$0.hasExpired(at: now) } }
 
     /// The window the headline number represents.

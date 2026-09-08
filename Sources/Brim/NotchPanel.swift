@@ -236,7 +236,7 @@ struct NotchView: View {
                              subdued: status == "Last known" || status == "Unavailable",
                              severity: window?.severity ?? .normal, surface: .notch,
                              busy: store.isRefreshing(tool))
-        let number = Text(window.map { "\(Int($0.usedPercent.rounded()))%" } ?? "·")
+        let number = Text(store.glanceValue(tool) ?? "·")
             .font(.system(size: metrics.numberType, weight: .medium, design: .rounded)).monospacedDigit()
             // The side-by-side layout gives the number a fixed slot, and a slot a
             // point too narrow wraps "100%" onto two lines rather than overflowing it.
@@ -270,7 +270,7 @@ struct NotchView: View {
                 Button("Open Brim") { openDashboard() }
             }
             .help("\(tool.name), click to refresh. Right-click for more.")
-            .accessibilityLabel("\(tool.name), \(window.map { "\(Int($0.usedPercent)) percent used" } ?? status)")
+            .accessibilityLabel("\(tool.name), \(store.glanceDescription(tool))")
     }
 }
 
@@ -314,19 +314,31 @@ struct HoverDetailView: View {
                     ToolMark(tool: tool, size: 24, tint: NotchPalette.text)
                     Text("\(tool.name) usage").font(.system(size: 17, weight: .medium)).tracking(-0.4)
                     Spacer()
-                    if tool.builtin != nil {
+                    if tool.builtin?.hasUsageLink ?? false {
                         Image(systemName: "arrow.up.right").font(.system(size: 11)).foregroundStyle(NotchPalette.muted)
                     }
                 }.contentShape(Rectangle())
-            }.buttonStyle(.plain).disabled(tool.builtin == nil).help(tool.linkHint)
+            }.buttonStyle(.plain).disabled(!(tool.builtin?.hasUsageLink ?? false)).help(tool.linkHint)
             if let scope = tool.scopeNote {
                 Text(scope).font(.system(size: 10)).foregroundStyle(NotchPalette.muted).fixedSize(horizontal: false, vertical: true)
             }
             let status = store.status(tool)
-            if let reading = store.reading(tool), !reading.windows.isEmpty {
+            if let reading = store.reading(tool), reading.hasReading {
                 let headline = reading.headline(at: store.now)
                 ForEach(reading.windows) { window in
                     UsageBar(window: window, now: store.now, emphasised: window.id == headline?.id, surface: .notch)
+                }
+                ForEach(reading.counts) { count in
+                    HStack(spacing: 8) {
+                        Text(count.title)
+                        Spacer(minLength: 8)
+                        Text(count.detail).monospacedDigit()
+                            .foregroundStyle(count.remaining == 0 ? NotchPalette.usage(100) : NotchPalette.text)
+                    }
+                    .font(.system(size: 12))
+                    .opacity(count.remaining == nil ? 0.6 : 1)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityLabel("\(count.title), \(count.detail)")
                 }
                 HStack(spacing: 5) {
                     Circle().fill(status == "Connected" ? NotchPalette.positive : NotchPalette.muted).frame(width: 4, height: 4)

@@ -13,7 +13,7 @@ import BrimCore
 /// disappointments on the first screen. The way in for anything else is the project
 /// itself: describe the tool (see Docs/add-a-tool.md) or contribute an adapter.
 enum KnownTool: String, CaseIterable, Identifiable {
-    case claudeCode, codex
+    case claudeCode, codex, perplexity
 
     var id: String { rawValue }
 
@@ -21,6 +21,7 @@ enum KnownTool: String, CaseIterable, Identifiable {
         switch self {
         case .claudeCode: "Claude Code"
         case .codex: "ChatGPT & Codex"
+        case .perplexity: "Perplexity"
         }
     }
 
@@ -29,6 +30,7 @@ enum KnownTool: String, CaseIterable, Identifiable {
         switch self {
         case .claudeCode: [.claude, .claudeCode]
         case .codex: [.chatgpt, .codex]
+        case .perplexity: [.perplexity]
         }
     }
 
@@ -43,6 +45,8 @@ enum KnownTool: String, CaseIterable, Identifiable {
         case .codex:
             return ["\(home)/.codex/auth.json", "\(home)/.codex",
                     "/Applications/ChatGPT.app", "/Applications/Codex.app"]
+        case .perplexity:
+            return ["/Applications/Perplexity.app", "\(home)/Applications/Perplexity.app"]
         }
     }
 
@@ -128,6 +132,17 @@ extension KnownTool {
             }
             return ToolConnection(status: .needsSignIn,
                                   detail: "The ChatGPT app is signed out. Sign in to read the Work allowance.")
+        case .perplexity:
+            if let error = store.errors[.perplexity] { return ToolConnection(status: .problem, detail: error) }
+            if store.signedInProviders.contains(.perplexity) {
+                return ToolConnection(status: .connected, detail: "Live · counts from the Perplexity app")
+            }
+            if !store.checkedProviders.contains(.perplexity) {
+                return ToolConnection(status: .checking, detail: "Looking for what Perplexity has recorded…")
+            }
+            return ToolConnection(status: .needsSignIn,
+                                  detail: "Perplexity hasn’t recorded any usage on this Mac yet. "
+                                  + "Sign in to Perplexity and run a search.")
         }
     }
 
@@ -140,6 +155,10 @@ extension KnownTool {
         case .codex:
             "Not connected. Connect to read the Work allowance ChatGPT and Codex share, through "
                 + "the ChatGPT app’s own sign-in. No API key needed."
+        case .perplexity:
+            "Not connected. Connect to read what Perplexity has left from the preferences its "
+                + "Mac app already writes. Counts, not a percentage: Perplexity never says what "
+                + "the allowance was."
         }
     }
 }

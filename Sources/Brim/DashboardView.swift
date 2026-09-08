@@ -8,18 +8,18 @@ import BrimCore
 /// `NavigationSplitView`, the content is `Form(.grouped)`, the controls are the system's
 /// own, and every colour comes from the appearance rather than from a fixed palette.
 enum DashboardPage: String, CaseIterable, Identifiable {
-    case overview = "Usage"
-    case time = "Time"
-    case connections = "Connections", appearance = "Notch", roadmap = "Roadmap"
+    case appearance = "Notch"
+    case connections = "Connections"
+    case overview = "Usage", time = "Time", roadmap = "Roadmap"
 
     var id: String { rawValue }
 
     var symbol: String {
         switch self {
+        case .appearance: "macbook"
+        case .connections: "link"
         case .overview: "chart.bar.fill"
         case .time: "calendar"
-        case .connections: "link"
-        case .appearance: "macbook"
         case .roadmap: "signpost.right.fill"
         }
     }
@@ -28,10 +28,10 @@ enum DashboardPage: String, CaseIterable, Identifiable {
     /// find a row without reading it.
     var tint: Color {
         switch self {
+        case .appearance: .indigo
+        case .connections: .green
         case .overview: .blue
         case .time: .pink
-        case .connections: .green
-        case .appearance: .indigo
         case .roadmap: .orange
         }
     }
@@ -39,7 +39,7 @@ enum DashboardPage: String, CaseIterable, Identifiable {
 
 @MainActor
 final class NavigationState: ObservableObject {
-    @Published var page = DashboardPage.overview
+    @Published var page = DashboardPage.appearance
     /// Shown on first launch, and reopenable from the menu.
     @Published var showWelcome = false
 }
@@ -104,7 +104,11 @@ struct DashboardView: View {
     // MARK: - Sidebar
 
     private var sidebar: some View {
-        List(selection: Binding(get: { navigation.page }, set: { navigation.page = $0 ?? .overview })) {
+        // The highlight *is* the open page: one source of truth in both directions, so
+        // whichever pane is showing — clicked here, or opened from the menu bar — is the
+        // row that reads as selected. A cleared selection keeps the page it was on
+        // rather than dropping the window back to Usage.
+        List(selection: Binding(get: { navigation.page }, set: { navigation.page = $0 ?? navigation.page })) {
             ForEach(DashboardPage.allCases) { page in
                 Label {
                     Text(page.rawValue)
@@ -140,10 +144,10 @@ struct DashboardView: View {
     @ViewBuilder private var detail: some View {
         Group {
             switch navigation.page {
+            case .appearance: AppearanceView(store: store)
+            case .connections: ConnectionsView(store: store)
             case .overview: overview
             case .time: TimeView(store: store, activity: activity)
-            case .connections: ConnectionsView(store: store)
-            case .appearance: AppearanceView(store: store)
             case .roadmap: RoadmapView()
             }
         }
@@ -193,9 +197,12 @@ struct DashboardView: View {
         let error = store.error(tool)
         let headline = reading?.headline(at: store.now)
         Section {
-            if let reading, !reading.windows.isEmpty {
+            if let reading, reading.hasReading {
                 ForEach(reading.windows) { window in
                     UsageRow(window: window, now: store.now, emphasised: window.id == headline?.id)
+                }
+                ForEach(reading.counts) { count in
+                    UsageCountRow(count: count)
                 }
             } else {
                 Text(store.emptyMessage(tool))
@@ -219,7 +226,7 @@ struct DashboardView: View {
             HStack(spacing: 8) {
                 ToolMark(tool: tool, size: 17, tint: .primary)
                 Text(tool.name).font(.headline)
-                if let provider = tool.builtin {
+                if let provider = tool.builtin, provider.hasUsageLink {
                     Button {
                         store.openUsage?(provider)
                     } label: {
@@ -291,6 +298,37 @@ struct UsageRow: View {
         .accessibilityLabel("\(window.title), \(Int(window.usedPercent.rounded())) percent used"
                             + (window.isActive ? ", currently limiting" : "")
                             + (window.isEstimated ? ", estimated" : ""))
+    }
+}
+
+/// One allowance a provider reports as a count rather than as a proportion.
+///
+/// No bar, and that is the whole point. A bar needs a denominator, and this row exists
+/// precisely because the provider did not give one. Drawing a half-full bar from a
+/// number that has no maximum would invent the figure the reading is missing.
+struct UsageCountRow: View {
+    let count: UsageCount
+
+    var body: some View {
+        HStack(spacing: 7) {
+            Text(count.title).font(.body)
+            Spacer(minLength: 8)
+            Text(count.detail)
+                .font(.body.weight(.medium)).monospacedDigit()
+                .foregroundStyle(tint)
+        }
+        .padding(.vertical, 3)
+        .opacity(count.remaining == nil ? 0.7 : 1)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(count.title), \(count.detail)")
+    }
+
+    /// Only zero is worth colouring. "2 left" is alarming out of five and unremarkable
+    /// out of three hundred, and without the allowance there is no telling which, so
+    /// every other count is left to read as plain text.
+    private var tint: Color {
+        guard let remaining = count.remaining else { return .secondary }
+        return remaining == 0 ? Palette.usage(100) : .primary
     }
 }
 
@@ -387,6 +425,16 @@ struct ConnectionsView: View {
         switch tool {
         case .claudeCode:
             ClaudeLiveSetupCard(store: store)
+        case .perplexity:
+            VStack(alignment: .leading, spacing: 10) {
+                Text(Provider.perplexity.usageScopeNote ?? "")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("Read from \(PerplexityUsage.preferencesPath), which the Perplexity app "
+                     + "writes itself. Nothing is sent anywhere, and no Perplexity login is touched.")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         case .codex:
             VStack(alignment: .leading, spacing: 10) {
                 Text(Provider.chatgpt.usageScopeNote ?? "")
@@ -784,10 +832,7 @@ struct RoadmapView: View {
                 mark: { AnyView(BrandGlyph(data: BrandMarks.cursor)
                     .fill(.primary, style: FillStyle(eoFill: true)).frame(width: 19, height: 19)) }),
         Planned(id: "figma-make", name: "Figma Make",
-                mark: { AnyView(FigmaMark(size: 19)) }),
-        Planned(id: "perplexity", name: "Perplexity",
-                mark: { AnyView(BrandGlyph(data: BrandMarks.perplexity)
-                    .fill(.primary).frame(width: 19, height: 19)) })
+                mark: { AnyView(FigmaMark(size: 19)) })
     ]
 
 
@@ -813,11 +858,14 @@ struct RoadmapView: View {
                           provider: .claude)
                 supported("ChatGPT · Codex", detail: "One Work allowance, read live from the ChatGPT app’s own engine.",
                           provider: .chatgpt)
+                supported("Perplexity", detail: "What is left of each mode, read from the preferences its Mac app writes.",
+                          provider: .perplexity)
             } header: {
                 Text("Supported today")
             } footer: {
                 Text("Each pair shares one allowance, so each is one ring rather than two showing the "
-                     + "same number.")
+                     + "same number. Perplexity is a count rather than a ring: it reports what is left "
+                     + "and never the allowance, so there is no proportion to draw.")
                     .fixedSize(horizontal: false, vertical: true)
             }
 
