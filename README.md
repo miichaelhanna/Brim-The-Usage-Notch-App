@@ -20,10 +20,10 @@ its own. Nothing connects itself on launch, and disconnecting stops all reading.
 
 ---
 
+![The notch on the edge of a Mac screen, one ring per allowance](Docs/Screenshots/notch.png)
+
 <p align="center">
-  <img src="Docs/Screenshots/notch.png" alt="The notch on a screen edge" height="330">
-  &nbsp;&nbsp;
-  <img src="Docs/Screenshots/notch-card.png" alt="Hovering a ring shows every limit and when it resets" height="330">
+  <img src="Docs/Screenshots/notch-card.png" alt="Hovering a ring shows every limit, which one is currently limiting, and when each resets" width="330">
 </p>
 
 ## Why
@@ -39,14 +39,20 @@ weekly model limit sits at 84%, the number worth seeing is 84%.
 
 ## Install
 
-Download the latest `.dmg` from [Releases](../../releases), drag Brim to
-Applications, and open it. It lives in your menu bar, with no Dock icon unless you
-ask for one, and opens at login so the numbers are there before you think to look.
-Both of those are switches in Settings.
+[**Download Brim**](https://github.com/miichaelhanna/Brim/releases/latest/download/Brim.dmg),
+drag it to Applications, and open it. That link always serves the newest release, and
+every release is also kept under its own version on the [Releases](../../releases) page.
+
+Brim lives in your menu bar, with no Dock icon unless you ask for one, and opens at
+login so the numbers are there before you think to look. Both of those are switches in
+Settings.
 
 Releases are signed with a Developer ID and notarised by Apple, so they open without
 warnings. If macOS ever says a build is unsigned or from an unidentified developer,
 that build did not come from here, see [SECURITY.md](SECURITY.md).
+
+Requires an Apple Silicon Mac on macOS 14 or later. The released build is arm64 only,
+so it does not run on an Intel Mac.
 
 Prefer to build it yourself? `bash Scripts/build.sh`.
 
