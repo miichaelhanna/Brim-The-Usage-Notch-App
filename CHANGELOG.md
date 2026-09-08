@@ -24,12 +24,17 @@ saying what each tool actually asks of you.
 
 ### Claude
 
-- **A lapsed Claude login is waited out rather than hammered.** Brim now notices when
-  Claude Code writes a fresh credential and retries then, backing off in between instead
-  of asking again every cycle. The renewal logic has tests; the end-to-end recovery has
-  not been watched happen, because provoking it needs a genuinely expired credential.
-- One message about a failed Claude read, where two could previously contradict
-  each other.
+- **A renewed Claude login is picked up in seconds rather than at the end of a backoff.**
+  When a live read fails, retries back off by doubling, up to half an hour — so signing
+  in again left an orange row on screen long after the credential behind it was valid.
+  Brim now watches for Claude Code writing a new login, which it can see without reading
+  the login itself, and tries again the moment one appears. The renewal logic has tests;
+  the end-to-end recovery has not been watched happen, because provoking it needs a
+  genuinely expired credential.
+- **The lapsed-login message names the thing that fixes it** — running the `claude`
+  command once — instead of promising that live usage resumes on its own. It does resume
+  on its own, but only after Claude Code has been used, and the old wording sent people
+  away to wait for something nothing had triggered.
 
 ### First run
 
