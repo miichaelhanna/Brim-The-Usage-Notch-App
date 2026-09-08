@@ -2,6 +2,52 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## 1.1.0 (2026-09-09)
+
+Where the week went, a notch sized to the screen it is on, and two things that were
+quietly wrong.
+
+### Time
+
+- **A month of days, and how long each tool was actually used on each of them.** The
+  rings answer how much of an allowance is left; they cannot answer where the week
+  went, and that question has a different source: the session transcripts Claude Code
+  and Codex already write on this Mac, not the providers.
+- **Only the timestamps are read.** The scan looks for `"timestamp":"` and takes the
+  nineteen bytes after it, walking bytes rather than decoding JSON, so there is nowhere
+  a prompt, an answer or a file path could land even by accident.
+- Off until it is asked for. Connecting Claude Code was permission to read a usage
+  figure, not permission to walk its transcripts, so this asks separately and reads
+  nothing until it is on. Turning it off deletes what the scan built.
+- Time at the desk, not a file left open: runs are stitched per transcript with an idle
+  cap, and two sessions running at once are counted once without being merged into one.
+- Claude and ChatGPT in a browser leave nothing on this Mac to time, so the page says
+  they are absent rather than drawing them as zero.
+
+### On screen
+
+- **One size control for the whole notch**, from 80% to 150% in steps of 5%. A notch
+  drawn for a 13-inch laptop is a speck on a 32-inch display, and one drawn for the
+  display takes most of a laptop's short edge.
+- One factor rather than a control per dimension: the notch was drawn to proportions
+  that hold together, so it resizes rather than rearranges. The screen preview in
+  Settings scales with it.
+
+### Fixed
+
+- **A failed live Claude read no longer reports itself as connected.** The Connections
+  row said "Signed in, showing Claude Code's cached reading" with a green tick while
+  the panel below it said, in orange, that the saved login had lapsed. First run had it
+  worst: it shows that row with nothing beneath it to contradict, so a lapsed login
+  looked like plain success.
+- **Opening at login is re-asserted on every launch.** It was registered once, on the
+  first run, and never looked at again, so a registration that failed that day was
+  never retried and one made from a copy of Brim that has since moved pointed at a
+  bundle macOS could no longer find. Either way the menu bar came up empty after a
+  restart. Turning the switch off in Settings is still remembered, and Brim being
+  switched off by hand in System Settings is left alone and reported rather than
+  fought.
+
 ## 1.0.0 (2026-09-08)
 
 First public release, and the first DMG meant to be installed and used.
