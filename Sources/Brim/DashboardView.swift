@@ -579,7 +579,7 @@ struct ConnectionsView: View {
 
 struct AppearanceView: View {
     @ObservedObject var store: UsageStore
-    @State private var launchAtLogin = LoginItem.isEnabled
+    @State private var launchAtLogin = LoginItem.isOn
     /// Registered, then switched off by hand in System Settings. Brim cannot turn that
     /// back on, so the switch says where the decision lives instead of failing quietly.
     @State private var loginNeedsApproval = LoginItem.needsApproval
@@ -769,7 +769,7 @@ struct AppearanceView: View {
     }
 
     private func readLoginItem() {
-        launchAtLogin = LoginItem.isEnabled
+        launchAtLogin = LoginItem.isOn
         loginNeedsApproval = LoginItem.needsApproval
     }
 

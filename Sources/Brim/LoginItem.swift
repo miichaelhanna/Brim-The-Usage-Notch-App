@@ -22,8 +22,18 @@ enum LoginItem {
     private static var service: SMAppService { .mainApp }
 
     static var isOff: Bool { UserDefaults.standard.bool(forKey: offKey) }
+    /// What the switch shows, and it starts out on.
+    ///
+    /// The stored decision rather than `SMAppService`'s status. The status is what
+    /// macOS has got round to, and on a fresh install it is `notRegistered` until
+    /// `assertRegistered()` has run and taken — so a switch reading the status showed
+    /// *off* on first run, for a setting that was on and about to be acted on. That
+    /// reads as a default nobody chose, and invites turning on something already on.
+    ///
+    /// The one state this hides is a registration that failed silently, and that is
+    /// the state `needsApproval` and the note beside the switch exist to show.
+    static var isOn: Bool { !isOff }
     static var status: SMAppService.Status { service.status }
-    static var isEnabled: Bool { status == .enabled }
     /// Registered, then switched off by hand in System Settings.
     static var needsApproval: Bool { status == .requiresApproval }
 

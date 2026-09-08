@@ -43,6 +43,10 @@ saying what each tool actually asks of you.
 
 ### Window
 
+- **Open at login shows as on, because it is.** The switch read `SMAppService`'s status,
+  which on a fresh install is "not registered yet" until the app has registered itself,
+  so a setting that was on and about to be acted on appeared off. It now shows the
+  decision Brim actually stores. macOS holding Brim off still says so, beside the switch.
 - The sidebar runs Notch, Connections, Usage, Time, Roadmap, and the window opens on
   Notch rather than on whatever was selected last.
 
