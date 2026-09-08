@@ -1,0 +1,66 @@
+Brim
+Copyright (c) 2026 Michael Hanna
+https://github.com/miichaelhanna/Brim
+
+Brim is released under the MIT License (see LICENSE).
+
+Attribution
+-----------
+
+The MIT License is permissive: you may use, copy, modify, merge, publish,
+distribute, sublicense and sell this software, including in closed source and
+commercial products. One condition applies, and it is not optional.
+
+  If you ship this software, or a substantial portion of it, you must include
+  the copyright notice and the permission notice from LICENSE.
+
+In practice that means:
+
+- Forking or vendoring the source: keep the LICENSE file and this NOTICE in
+  place, and keep the copyright line intact. Add your own copyright line for
+  your changes rather than replacing the existing one.
+- Shipping a binary built from this code: include the licence text somewhere a
+  user can reach it, for example an About window, a Licences screen, a
+  third-party notices file, or the documentation that ships with the product.
+- Copying a file, a type or a meaningful block of this code into another
+  project: carry the copyright notice with it.
+
+Beyond what the licence requires, a link back to
+https://github.com/miichaelhanna/Brim is appreciated and helps people find the
+original. Credit reads well as:
+
+  Based on Brim by Michael Hanna, MIT licensed.
+  https://github.com/miichaelhanna/Brim
+
+What the licence does not grant
+-------------------------------
+
+The name "Brim" and the project's own artwork identify this project. The MIT
+grant covers the code, not the use of the name to describe a derived product in
+a way that suggests it is this one. Fork freely, then name your fork something
+of your own.
+
+Third party marks
+-----------------
+
+Brim is not affiliated with, endorsed by, or sponsored by Anthropic, OpenAI,
+Perplexity, or any other provider it reports on.
+
+Product names and logos are trademarks of their respective owners. Brim renders
+each provider's mark solely to identify which service a reading belongs to.
+Those marks are not covered by the MIT licence above, are not this project's to
+license, and remain the property of their owners.
+
+Icon provenance
+---------------
+
+The Claude, Claude Code, OpenAI and Perplexity outlines are derived from Simple
+Icons (https://simpleicons.org), released into the public domain under CC0 1.0.
+The brand marks they depict remain the trademarks of their respective owners.
+
+The Codex outline was transcribed from the asset shipped inside the installed
+ChatGPT application. It is reproduced here to identify that product, and it is
+OpenAI's artwork rather than this project's.
+
+If you own one of these marks and would rather it were not used here, open an
+issue and it will be removed.

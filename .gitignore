@@ -1,0 +1,13 @@
+# Build output
+.build/
+dist/
+.swiftpm/
+*.xcuserstate
+
+# macOS
+.DS_Store
+
+# Local tooling and working notes, never published
+.claude/
+handover.md
+Docs/Handover/

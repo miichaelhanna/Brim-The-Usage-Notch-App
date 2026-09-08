@@ -1,0 +1,42 @@
+name: Build and test
+
+# No secrets are used here, deliberately. Signing and notarisation happen on a
+# maintainer's machine, so no Developer ID certificate or Apple credential ever
+# reaches a CI runner.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Swift version
+        run: swift --version
+      - name: No dependencies
+        # Having none is this project's strongest security property. It removes the
+        # supply chain entirely. Enforced so it cannot be lost by accident.
+        run: |
+          if grep -qE '^\s*\.package\(' Package.swift; then
+            echo "Package.swift declares a dependency. This project deliberately has none, see SECURITY.md."
+            exit 1
+          fi
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+      - name: Fail on warnings
+        # Warnings have been kept at zero. Catching a new one in review is cheaper
+        # than letting them accumulate until nobody reads the build log.
+        run: |
+          if swift build 2>&1 | grep -q "warning:"; then
+            echo "Build produced warnings:"
+            swift build 2>&1 | grep "warning:"
+            exit 1
+          fi
