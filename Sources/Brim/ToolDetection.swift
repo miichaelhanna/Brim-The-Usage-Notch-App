@@ -104,6 +104,14 @@ extension KnownTool {
             if store.liveClaude == .checking || !store.checkedProviders.contains(.claudeCode) {
                 return ToolConnection(status: .checking, detail: "Checking the Claude Code sign-in on this Mac…")
             }
+            // A live read that has failed is the honest headline, even while a cached
+            // reading is still on screen: it is the reason the number stopped moving.
+            // Reporting the cache instead left this row green and reassuring directly
+            // above the orange sentence saying the login had lapsed, and told first run,
+            // which has no such sentence, nothing at all.
+            if case .problem(let message) = store.liveClaude {
+                return ToolConnection(status: .problem, detail: message)
+            }
             if store.signedInProviders.contains(.claudeCode) {
                 return ToolConnection(status: .connected,
                                       detail: "Signed in, showing Claude Code’s cached reading. "

@@ -20,7 +20,7 @@ struct ClaudeLiveSetupCard: View {
             case .on: connected
             case .checking: checking
             case .off: offered
-            case .problem(let message): problem(message)
+            case .problem: problem
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -69,11 +69,22 @@ struct ClaudeLiveSetupCard: View {
         }
     }
 
-    private func problem(_ message: String) -> some View {
+    /// The row this card opens under already carries what went wrong and the button
+    /// that retries it. Saying both again here put the same sentence and the same
+    /// button twice within an inch of each other; what is left is the part the row has
+    /// no room for.
+    private var problem: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(message).font(.caption).foregroundStyle(.orange)
+            if store.snapshot(.claudeCode) != nil {
+                Text("Until the live read works, Brim keeps showing Claude Code’s cached reading with "
+                     + "its true age, rather than a number it can’t stand behind.")
+                    .font(.callout)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Text("A read that fails changes nothing at the other end. Brim only ever reads that login, "
+                 + "so it cannot expire or invalidate it, and cannot sign you out of Claude Code.")
+                .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
-            Button("Try Again") { store.connect(.claudeCode) }.buttonStyle(.borderedProminent)
             skipNote
         }
     }
