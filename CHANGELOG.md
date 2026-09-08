@@ -2,6 +2,49 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## 1.3.0 (2026-09-09)
+
+The notch moves the way it always looked like it should, and the window says which
+build of it you are running.
+
+### The notch
+
+- **Opening is one motion rather than three.** The notch used to swap its whole contents
+  the instant it opened and then resize around them, so the expanded layout spent the
+  entire animation being squeezed into a window far too small for it and sprang out at
+  the end. Nothing is swapped now. The silhouette is drawn to whatever size the notch
+  currently is, and the contents are laid out once at their full size and pinned to the
+  screen edge, so the notch growing *uncovers* them instead of compressing them.
+- **The rings, the grip and the button all arrive**, as one wave out of the screen edge,
+  counted from the end the notch is anchored to. Only the rings animated before and
+  everything else snapped in, which is what made an opening notch look half-finished.
+- **Folding away is animated too**, and deliberately not the opening in reverse. The
+  contents leave quickly and all together, because a staggered exit reads as hesitation
+  and they have to be gone before the edge slides back across them.
+- **The resize can be interrupted.** It runs on the display's own clock rather than as a
+  queued window animation, so a pointer that arrives and leaves again quickly no longer
+  plays two resizes back to back with the notch stuttering between the two sizes.
+
+### The usage card
+
+- **The card grows out of the notch.** It used to appear whole, at full size, a fixed gap
+  from a ring, with nothing tying it to the notch it had come from. It now scales up from
+  the side facing the notch, starting a little way inside it, and retracts the same way
+  rather than being pulled out from under the pointer.
+- **Moving between rings slides the card across** instead of teleporting it.
+- Its shadow is drawn by the card now rather than by the window around it. A window
+  shadow is fixed to the window's shape and is not redrawn as the contents change, so it
+  sat at the size of the finished card while the card was still growing into it.
+
+Reduced Motion switches all of this off, as it did before.
+
+### Window
+
+- **The foot of the sidebar says which build is running**: the version, and the minute
+  that build was made. The version on its own does not tell two builds of one release
+  apart, which is the question it is there to answer. It can be selected and copied,
+  since it is the first thing an issue asks for.
+
 ## 1.2.0 (2026-09-09)
 
 A fourth tool to read, a Claude login that repairs itself, and the first-run screen
