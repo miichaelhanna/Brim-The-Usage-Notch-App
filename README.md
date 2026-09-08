@@ -2,8 +2,8 @@
 
 Your AI limits, on the edge of your screen.
 
-[![Build and test](https://github.com/miichaelhanna/Brim/actions/workflows/ci.yml/badge.svg)](https://github.com/miichaelhanna/Brim/actions/workflows/ci.yml)
-[![Latest release](https://img.shields.io/github/v/release/miichaelhanna/Brim?label=download)](https://github.com/miichaelhanna/Brim/releases/latest)
+[![Build and test](https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/actions/workflows/ci.yml/badge.svg)](https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/miichaelhanna/Brim-The-Usage-Notch-App?label=download)](https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/releases/latest)
 [![Licence: MIT](https://img.shields.io/badge/licence-MIT-blue.svg)](LICENSE)
 [![macOS 14+](https://img.shields.io/badge/macOS-14%2B-lightgrey.svg)](#install)
 
@@ -39,7 +39,7 @@ weekly model limit sits at 84%, the number worth seeing is 84%.
 
 ## Install
 
-[**Download Brim**](https://github.com/miichaelhanna/Brim/releases/latest/download/Brim.dmg),
+[**Download Brim**](https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/releases/latest/download/Brim.dmg),
 drag it to Applications, and open it. That link always serves the newest release, and
 every release is also kept under its own version on the [Releases](../../releases) page.
 

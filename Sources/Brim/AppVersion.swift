@@ -17,7 +17,7 @@ enum AppVersion {
 
 /// Where the app points people. One place, so a moved repo is one edit.
 enum Links {
-    static let addATool = URL(string: "https://github.com/miichaelhanna/Brim/blob/main/Docs/add-a-tool.md")!
-    static let providers = URL(string: "https://github.com/miichaelhanna/Brim/blob/main/Docs/providers.md")!
-    static let requestProvider = URL(string: "https://github.com/miichaelhanna/Brim/issues/new?template=provider_request.md")!
+    static let addATool = URL(string: "https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/blob/main/Docs/add-a-tool.md")!
+    static let providers = URL(string: "https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/blob/main/Docs/providers.md")!
+    static let requestProvider = URL(string: "https://github.com/miichaelhanna/Brim-The-Usage-Notch-App/issues/new?template=provider_request.md")!
 }

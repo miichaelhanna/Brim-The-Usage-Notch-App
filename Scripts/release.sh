@@ -11,7 +11,7 @@ cd "$(dirname "$0")/.."
 
 VERSION="$(tr -d '[:space:]' < VERSION)"
 TAG="v$VERSION"
-REPO="${REPO:-miichaelhanna/Brim}"
+REPO="${REPO:-miichaelhanna/Brim-The-Usage-Notch-App}"
 NOTES="${NOTES:-}"
 
 # Releasing a dirty tree ships something no commit describes, and the tag then
