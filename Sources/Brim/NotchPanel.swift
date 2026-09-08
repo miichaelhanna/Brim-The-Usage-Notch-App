@@ -9,29 +9,38 @@ import BrimCore
 /// Small, but not cramped. With one ring per allowance there are two rings rather than
 /// four, and the first cut at these figures, 54pt wide with 7pt between rings, read as
 /// crowded, so the rings were given room to breathe instead.
-private enum NotchMetrics {
-    static let edgeWidth: CGFloat = 66
-    static let edgeItemHeight: CGFloat = 56
-    static let edgeItemWidth: CGFloat = 56
+struct NotchMetrics {
+    /// The size every figure below is written at. `NotchSize` multiplies them, so the
+    /// one control in Settings moves all of them together and the drawing is resized
+    /// rather than rearranged.
+    let size: NotchSize
+    init(_ size: NotchSize = .standard) { self.size = size }
+    private func scaled(_ points: CGFloat) -> CGFloat { size.scaled(points) }
+
+    var edgeWidth: CGFloat { scaled(66) }
+    var edgeItemHeight: CGFloat { scaled(56) }
+    var edgeItemWidth: CGFloat { scaled(56) }
     /// A single ring on a top or bottom edge puts its number beside it rather than
     /// under it: a bar has width to spend and no height to waste. Stacking is for a
     /// column of rings, and for the side edges, which have neither.
-    static let edgeRowItemWidth: CGFloat = ring + rowNumberSpacing + rowNumberWidth
-    static let edgeRowItemHeight: CGFloat = 40
+    var edgeRowItemWidth: CGFloat { ring + rowNumberSpacing + rowNumberWidth }
+    var edgeRowItemHeight: CGFloat { scaled(40) }
     /// Wide enough for the widest reading, and no wider. The number is centred in it
     /// rather than aligned to one end, so the gap either side of it stays equal
     /// whether it says 8% or 100%.
-    static let rowNumberWidth: CGFloat = 42
-    static let rowNumberSpacing: CGFloat = 8
-    static let edgeSpacing: CGFloat = 12
-    static let ring: CGFloat = 36
+    var rowNumberWidth: CGFloat { scaled(42) }
+    var rowNumberSpacing: CGFloat { scaled(8) }
+    var edgeSpacing: CGFloat { scaled(12) }
+    var ring: CGFloat { scaled(36) }
+    /// Between a ring and the number under it.
+    var stackSpacing: CGFloat { scaled(5) }
     /// The button that opens the app. Its circle is its frame, so the gap it leaves
     /// at that end of the notch is the gap you actually see.
-    static let openButton: CGFloat = 22
+    var openButton: CGFloat { scaled(22) }
 
-    static let gripThickness: CGFloat = 20
+    var gripThickness: CGFloat { scaled(20) }
     /// Across the strip: the grip's other dimension, and its hit area.
-    static let gripBreadth: CGFloat = 34
+    var gripBreadth: CGFloat { scaled(34) }
 
     /// The visible gap between the end of the notch and the first thing drawn in it.
     ///
@@ -41,29 +50,44 @@ private enum NotchMetrics {
     /// anyone can see. It also has to clear the shape's flared shoulder, which eats
     /// roughly the first 33pt: a grip flush to the end lands half outside the
     /// silhouette and cannot be grabbed.
-    static let endGap: CGFloat = 26
+    var endGap: CGFloat { scaled(26) }
     /// Derived, not typed twice. These drifted apart once already.
-    static var leadingPadding: CGFloat { endGap - (gripThickness - NotchGripView.inkAlongStrip) / 2 }
-    static var trailingPadding: CGFloat { endGap }
+    var leadingPadding: CGFloat { endGap - (gripThickness - scaled(NotchGripView.inkAlongStrip)) / 2 }
+    var trailingPadding: CGFloat { endGap }
     /// Across the strip, on a top or bottom edge. A side edge has a fixed width
     /// instead, and centres its items in it.
-    static let crossPadding: CGFloat = 12
+    var crossPadding: CGFloat { scaled(12) }
+
+    /// Type. Scaled but not rounded, so the number grows as smoothly as the ring
+    /// around it.
+    var numberType: CGFloat { size.scaledType(13) }
+    var openGlyphType: CGFloat { size.scaledType(11) }
+    /// The collapsed handle, and the pill drawn on it. It is the only thing on screen
+    /// while the notch is folded away, so it follows the same size as the rest.
+    func collapsedSize(_ anchor: NotchAnchor) -> CGSize {
+        let base = NotchRevealState.collapsedSize
+        let thickness = scaled(base.width), length = scaled(base.height)
+        return anchor.isHorizontal ? CGSize(width: length, height: thickness)
+                                   : CGSize(width: thickness, height: length)
+    }
+    var collapsedCapDepth: CGFloat { scaled(24) }
+    var collapsedPill: CGSize { CGSize(width: scaled(26), height: scaled(2)) }
 
     /// Where the rings begin, measured from the leading end of the notch: past the
     /// grip and the gap after it. Derived so the hover card and the layout cannot
     /// disagree about where an item is.
-    static var contentLeadingInset: CGFloat { leadingPadding + gripThickness + edgeSpacing }
+    var contentLeadingInset: CGFloat { leadingPadding + gripThickness + edgeSpacing }
 
-    static func laysSideBySide(anchor: NotchAnchor, toolCount: Int) -> Bool {
+    func laysSideBySide(anchor: NotchAnchor, toolCount: Int) -> Bool {
         anchor.isHorizontal && toolCount == 1
     }
-    static func itemSize(anchor: NotchAnchor, toolCount: Int) -> CGSize {
+    func itemSize(anchor: NotchAnchor, toolCount: Int) -> CGSize {
         laysSideBySide(anchor: anchor, toolCount: toolCount)
             ? CGSize(width: edgeRowItemWidth, height: edgeRowItemHeight)
             : CGSize(width: edgeItemWidth, height: edgeItemHeight)
     }
     /// The item's extent along the edge it is laid out on.
-    static func itemLength(anchor: NotchAnchor, toolCount: Int) -> CGFloat {
+    func itemLength(anchor: NotchAnchor, toolCount: Int) -> CGFloat {
         let size = itemSize(anchor: anchor, toolCount: toolCount)
         return anchor.isHorizontal ? size.width : size.height
     }
@@ -72,13 +96,13 @@ private enum NotchMetrics {
     /// button belong on the ring's line, since centred on the item they read as sagging.
     /// A side edge centres across its width, where the ring already is, and a single
     /// ring on a bar has its number beside it, so neither needs this.
-    static func ringLineOffset(anchor: NotchAnchor, toolCount: Int) -> CGFloat {
+    func ringLineOffset(anchor: NotchAnchor, toolCount: Int) -> CGFloat {
         guard anchor.isHorizontal, !laysSideBySide(anchor: anchor, toolCount: toolCount) else { return 0 }
         return (edgeItemHeight - ring) / 2
     }
 
     /// The centre of one item, from the leading end of the notch.
-    static func itemCenter(index: Int, anchor: NotchAnchor, toolCount: Int) -> CGFloat {
+    func itemCenter(index: Int, anchor: NotchAnchor, toolCount: Int) -> CGFloat {
         let length = itemLength(anchor: anchor, toolCount: toolCount)
         return contentLeadingInset + length / 2 + CGFloat(index) * (length + edgeSpacing)
     }
@@ -127,22 +151,26 @@ struct NotchView: View {
     var animateReveal = true
     @State private var revealed = false
     @State private var openHovered = false
+    /// Read from the store rather than passed in, so changing the size in Settings
+    /// redraws the notch the same way changing anything else on it does.
+    private var metrics: NotchMetrics { NotchMetrics(store.notchSize) }
     /// Honoured rather than assumed: an edge notch that pops open is exactly the kind
     /// of motion people turn this off to avoid.
     private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     var body: some View {
-        let sideBySide = NotchMetrics.laysSideBySide(anchor: placement, toolCount: store.activeTools.count)
-        let ringLine = NotchMetrics.ringLineOffset(anchor: placement, toolCount: store.activeTools.count)
-        let layout = placement.isHorizontal ? AnyLayout(HStackLayout(spacing: NotchMetrics.edgeSpacing)) : AnyLayout(VStackLayout(spacing: NotchMetrics.edgeSpacing))
+        let metrics = self.metrics
+        let sideBySide = metrics.laysSideBySide(anchor: placement, toolCount: store.activeTools.count)
+        let ringLine = metrics.ringLineOffset(anchor: placement, toolCount: store.activeTools.count)
+        let layout = placement.isHorizontal ? AnyLayout(HStackLayout(spacing: metrics.edgeSpacing)) : AnyLayout(VStackLayout(spacing: metrics.edgeSpacing))
         layout {
             // The grip is a member of the stack rather than an overlay sitting on
             // padding reserved for it. As an overlay only the leading end held a
             // grip, while both ends reserved room for one, so the notch had a wide
             // empty margin at one end and a tight one at the other.
-            NotchPositionControl(onDrag: onSlide)
-                .frame(width: placement.isHorizontal ? NotchMetrics.gripThickness : NotchMetrics.gripBreadth,
-                       height: placement.isHorizontal ? NotchMetrics.gripBreadth : NotchMetrics.gripThickness)
+            NotchPositionControl(onDrag: onSlide, scale: metrics.size.scale)
+                .frame(width: placement.isHorizontal ? metrics.gripThickness : metrics.gripBreadth,
+                       height: placement.isHorizontal ? metrics.gripBreadth : metrics.gripThickness)
                 .offset(y: -ringLine)
             // The rings arrive in sequence rather than all at once. The stagger is
             // small, a few frames apart, because the notch opens on hover and a
@@ -157,11 +185,11 @@ struct NotchView: View {
                                value: revealed)
             }
             openButton.offset(y: -ringLine)
-        }.padding(.leading, placement.isHorizontal ? NotchMetrics.leadingPadding : 0)
-            .padding(.trailing, placement.isHorizontal ? NotchMetrics.trailingPadding : 0)
-            .padding(.top, placement.isHorizontal ? NotchMetrics.crossPadding : NotchMetrics.leadingPadding)
-            .padding(.bottom, placement.isHorizontal ? NotchMetrics.crossPadding : NotchMetrics.trailingPadding)
-            .frame(width: placement.isHorizontal ? nil : NotchMetrics.edgeWidth)
+        }.padding(.leading, placement.isHorizontal ? metrics.leadingPadding : 0)
+            .padding(.trailing, placement.isHorizontal ? metrics.trailingPadding : 0)
+            .padding(.top, placement.isHorizontal ? metrics.crossPadding : metrics.leadingPadding)
+            .padding(.bottom, placement.isHorizontal ? metrics.crossPadding : metrics.trailingPadding)
+            .frame(width: placement.isHorizontal ? nil : metrics.edgeWidth)
             .background(EdgeNotchShape(placement: placement).fill(.black))
             .foregroundStyle(.white).preferredColorScheme(.dark)
             .onAppear { revealed = true }
@@ -179,10 +207,10 @@ struct NotchView: View {
             ZStack {
                 Circle().fill(.white.opacity(openHovered ? 0.22 : 0.10))
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: metrics.openGlyphType, weight: .semibold))
                     .foregroundStyle(openHovered ? NotchPalette.text : NotchPalette.muted)
             }
-            .frame(width: NotchMetrics.openButton, height: NotchMetrics.openButton)
+            .frame(width: metrics.openButton, height: metrics.openButton)
             // Padded well past the artwork: 22pt of circle is a small target on an
             // edge the pointer arrives at from outside the screen.
             .contentShape(Circle().inset(by: -7))
@@ -198,31 +226,32 @@ struct NotchView: View {
     private func item(_ tool: TrackedTool, sideBySide: Bool) -> some View {
         let window = store.headline(tool)
         let status = store.status(tool)
-        let size = NotchMetrics.itemSize(anchor: placement, toolCount: store.activeTools.count)
+        let metrics = self.metrics
+        let size = metrics.itemSize(anchor: placement, toolCount: store.activeTools.count)
         // Ring and number only. The provider's own mark identifies it, so a name
         // underneath repeated what the icon already said and cost a third of the
         // notch's height, and truncated to "ChatGPT W…" while doing it. The full
         // name is one hover away on the card.
-        let ring = UsageRing(tool: tool, percent: window?.usedPercent, size: NotchMetrics.ring,
+        let ring = UsageRing(tool: tool, percent: window?.usedPercent, size: metrics.ring,
                              subdued: status == "Last known" || status == "Unavailable",
                              severity: window?.severity ?? .normal, surface: .notch,
                              busy: store.isRefreshing(tool))
         let number = Text(window.map { "\(Int($0.usedPercent.rounded()))%" } ?? "·")
-            .font(.system(size: 13, weight: .medium, design: .rounded)).monospacedDigit()
+            .font(.system(size: metrics.numberType, weight: .medium, design: .rounded)).monospacedDigit()
             // The side-by-side layout gives the number a fixed slot, and a slot a
             // point too narrow wraps "100%" onto two lines rather than overflowing it.
             .lineLimit(1)
         return Button { onRefresh(tool) } label: {
             Group {
                 if sideBySide {
-                    HStack(spacing: NotchMetrics.rowNumberSpacing) {
+                    HStack(spacing: metrics.rowNumberSpacing) {
                         ring
                         // A fixed width: the notch must not resize itself as the
                         // number crosses from 9% to 100%.
-                        number.frame(width: NotchMetrics.rowNumberWidth)
+                        number.frame(width: metrics.rowNumberWidth)
                     }
                 } else {
-                    VStack(spacing: 5) { ring; number }
+                    VStack(spacing: metrics.stackSpacing) { ring; number }
                 }
             }
             .frame(width: size.width, height: size.height)
@@ -250,12 +279,17 @@ struct CollapsedNotchView: View {
     /// Passed in rather than derived: on a notched Mac the collapsed top notch is
     /// exactly the hardware notch, which is a property of the display.
     let size: CGSize
+    /// Required rather than defaulted: a collapsed notch drawn at the designed size
+    /// inside a frame sized for a larger one is the kind of mismatch nothing catches.
+    let metrics: NotchMetrics
     let expand: () -> Void
     var body: some View {
-        Button(action: expand) {
-            EdgeNotchShape(placement: placement, endCapDepth: 24).fill(.black)
+        let pill = metrics.collapsedPill
+        return Button(action: expand) {
+            EdgeNotchShape(placement: placement, endCapDepth: metrics.collapsedCapDepth).fill(.black)
                 .overlay(Capsule().fill(.white.opacity(0.4))
-                    .frame(width: placement.isHorizontal ? 26 : 2, height: placement.isHorizontal ? 2 : 26))
+                    .frame(width: placement.isHorizontal ? pill.width : pill.height,
+                           height: placement.isHorizontal ? pill.height : pill.width))
                 .frame(width: size.width, height: size.height)
                 // The collapsed notch can be 12pt across. The hit area is padded well
                 // past the artwork so it can actually be hit.
@@ -346,6 +380,7 @@ final class NotchController {
     private var openDashboard: () -> Void
     private var openConnections: () -> Void
     private var targetScreen: NSScreen? { ScreenGeometry.target }
+    private var metrics: NotchMetrics { NotchMetrics(store.notchSize) }
 
     init(store: UsageStore, openDashboard: @escaping () -> Void, openConnections: @escaping () -> Void) {
         self.store = store; self.openDashboard = openDashboard; self.openConnections = openConnections
@@ -415,6 +450,7 @@ final class NotchController {
             view = AnyView(fullView(at: anchor))
         } else {
             view = AnyView(CollapsedNotchView(placement: anchor, size: collapsedSize(for: anchor),
+                                              metrics: metrics,
                                               expand: { [weak self] in self?.expand() }))
         }
         let host = NSHostingView(rootView: view)
@@ -437,7 +473,7 @@ final class NotchController {
         if anchor == .top, let cutout = currentLayout?.cutout {
             return CGSize(width: cutout.width, height: cutout.depth)
         }
-        return anchor.isHorizontal ? CGSize(width: 72, height: 12) : NotchRevealState.collapsedSize
+        return metrics.collapsedSize(anchor)
     }
 
     /// The top edge has to reach the menu-bar layer to meet the hardware notch. Every
@@ -580,7 +616,7 @@ final class NotchController {
         let index = store.activeTools.firstIndex(of: tool) ?? 0
         // Asked of the metrics rather than recomputed here: a typed 56 once drifted
         // from the real item width, and the item is not one fixed size any more.
-        let itemCenter = NotchMetrics.itemCenter(index: index, anchor: anchor, toolCount: store.activeTools.count)
+        let itemCenter = metrics.itemCenter(index: index, anchor: anchor, toolCount: store.activeTools.count)
         guard let frame = layout.detailFrame(size: size, notchFrame: panel.frame, anchor: anchor, itemCenterFromTop: itemCenter) else { detail?.orderOut(nil); return }
         if detail == nil { detail = makeDetailPanel(frame: frame) }
         host.frame = NSRect(origin: .zero, size: size)

@@ -11,15 +11,21 @@ enum NotchSlidePhase {
 /// moved by accident.
 struct NotchPositionControl: NSViewRepresentable {
     let onDrag: (CGPoint, NotchSlidePhase) -> Void
+    /// The dots grow with the notch. Left at their designed size inside a grip that
+    /// scales, they read as a smaller and smaller speck at the end of a larger and
+    /// larger strip, and the notch stops looking like one drawing.
+    var scale: CGFloat = 1
 
     func makeNSView(context: Context) -> NotchGripView {
         let view = NotchGripView()
         view.onDrag = onDrag
+        view.scale = scale
         return view
     }
 
     func updateNSView(_ view: NotchGripView, context: Context) {
         view.onDrag = onDrag
+        view.scale = scale
     }
 
     // Deliberately no dismantleNSView. Changing edges mid-drag replaces the
@@ -189,6 +195,9 @@ final class NotchGripView: NSView {
     /// Whichever way the grip is turned, two dots lie along the strip and three
     /// across it, so the ink along the strip is one gap plus one dot.
     nonisolated static var inkAlongStrip: CGFloat { dotSpacing + dotRadius * 2 }
+    /// Set by the layout, which knows the notch's size. Only the drawing uses it;
+    /// the frame is given to this view already scaled.
+    var scale: CGFloat = 1 { didSet { guard scale != oldValue else { return }; needsDisplay = true } }
 
     override func draw(_ dirtyRect: NSRect) {
         NSColor.white.withAlphaComponent(0.45).setFill()
@@ -199,7 +208,7 @@ final class NotchGripView: NSView {
         let isWide = bounds.width >= bounds.height
         let columns = isWide ? alongStrip : acrossStrip
         let rows = isWide ? acrossStrip : alongStrip
-        let spacing = Self.dotSpacing, radius = Self.dotRadius
+        let spacing = Self.dotSpacing * scale, radius = Self.dotRadius * scale
         let originX = bounds.midX - CGFloat(columns - 1) * spacing / 2
         let originY = bounds.midY - CGFloat(rows - 1) * spacing / 2
         for column in 0..<columns {

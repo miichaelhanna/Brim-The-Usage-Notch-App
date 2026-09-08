@@ -18,7 +18,8 @@ enum NotchRenderer {
             write(AnyView(expanded(anchor, store: store)),
                   to: folder.appendingPathComponent("notch-\(anchor.rawValue)-expanded.png"))
             write(AnyView(CollapsedNotchView(placement: anchor,
-                                             size: collapsedSize(anchor),
+                                             size: collapsedSize(anchor, store: store),
+                                             metrics: NotchMetrics(store.notchSize),
                                              expand: {})),
                   to: folder.appendingPathComponent("notch-\(anchor.rawValue)-collapsed.png"))
         }
@@ -29,8 +30,8 @@ enum NotchRenderer {
         print("Rendered notch states into \(folder.path)")
     }
 
-    private static func collapsedSize(_ anchor: NotchAnchor) -> CGSize {
-        anchor.isHorizontal ? CGSize(width: 72, height: 12) : NotchRevealState.collapsedSize
+    private static func collapsedSize(_ anchor: NotchAnchor, store: UsageStore) -> CGSize {
+        NotchMetrics(store.notchSize).collapsedSize(anchor)
     }
 
     private static func expanded(_ anchor: NotchAnchor, store: UsageStore) -> some View {

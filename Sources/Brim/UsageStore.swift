@@ -40,6 +40,16 @@ final class UsageStore: ObservableObject {
     @Published var visibilityMode: NotchVisibilityMode { didSet { defaults.set(visibilityMode.rawValue, forKey: "visibilityMode"); onLayoutChange?() } }
     @Published var presence: AppPresence { didSet { defaults.set(presence.rawValue, forKey: "presence"); onPresenceChange?() } }
     @Published var collapseWhenIdle: Bool { didSet { defaults.set(collapseWhenIdle, forKey: "collapseWhenIdle"); onLayoutChange?() } }
+    /// How large the notch is drawn. A layout change rather than a redraw: the panel
+    /// is sized from what its content measures, so the window has to be rebuilt at the
+    /// new size, not just repainted.
+    @Published var notchSize: NotchSize {
+        didSet {
+            guard notchSize != oldValue else { return }
+            defaults.set(Double(notchSize.scale), forKey: "notchSize")
+            onLayoutChange?()
+        }
+    }
     /// What appears on the notch, by `TrackedTool.id`. Provider ids are their raw
     /// values, so a preference saved before described tools existed still applies.
     @Published var visible: Set<String> { didSet { defaults.set(Array(visible), forKey: "visible"); onLayoutChange?() } }
@@ -127,6 +137,11 @@ final class UsageStore: ObservableObject {
         presence = AppPresence(saved: defaults.string(forKey: "presence"))
         appearance = AppAppearance(saved: defaults.string(forKey: "appearance"))
         collapseWhenIdle = defaults.bool(forKey: "collapseWhenIdle")
+        // Read through `double(forKey:)` rather than cast, so a size passed on the
+        // command line as `-notchSize 1.4` is honoured too: that is how the notch is
+        // rendered at each size for review. The presence check keeps "never set"
+        // distinct from a saved zero.
+        notchSize = NotchSize(saved: defaults.object(forKey: "notchSize") == nil ? nil : defaults.double(forKey: "notchSize"))
         visible = Set(defaults.stringArray(forKey: "visible") ?? Provider.allCases.map(\.rawValue))
         autoRefresh = defaults.object(forKey: "autoRefresh") as? Bool ?? true
         if let saved = defaults.stringArray(forKey: "connectedTools") {

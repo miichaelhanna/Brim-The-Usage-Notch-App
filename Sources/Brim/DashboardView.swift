@@ -546,6 +546,7 @@ struct AppearanceView: View {
     var body: some View {
         Form {
             position
+            size
             presence
             visibility
             contents
@@ -590,6 +591,47 @@ struct AppearanceView: View {
         }
     }
 
+    /// One control for the whole drawing, rather than one per dimension. The notch's
+    /// proportions are the design; what changes between a 13-inch laptop and a 32-inch
+    /// display is how big the whole thing should be on it.
+    private var size: some View {
+        Section {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 12) {
+                    Slider(value: Binding(get: { Double(store.notchSize.scale) },
+                                          set: { store.notchSize = NotchSize(scale: CGFloat($0)) }),
+                           in: Double(NotchSize.range.lowerBound)...Double(NotchSize.range.upperBound),
+                           step: Double(NotchSize.stepPercent) / 100) {
+                        Text("Size")
+                    } minimumValueLabel: {
+                        Image(systemName: "circle").font(.system(size: 8)).foregroundStyle(.secondary)
+                    } maximumValueLabel: {
+                        Image(systemName: "circle").font(.system(size: 14)).foregroundStyle(.secondary)
+                    }
+                    .accessibilityLabel("Notch size")
+                    .accessibilityValue(store.notchSize.label)
+                    // A fixed slot: the percentage must not shove the slider sideways
+                    // as it crosses from 95% to 100%.
+                    Text(store.notchSize.label)
+                        .font(.callout).monospacedDigit().foregroundStyle(.secondary)
+                        .frame(width: 42, alignment: .trailing)
+                }
+                Button("Reset to default") { store.notchSize = .standard }
+                    .buttonStyle(.link).font(.caption)
+                    .disabled(store.notchSize.isStandard)
+            }
+            .padding(.vertical, 2)
+        } header: {
+            Text("Size")
+        } footer: {
+            Text("Everything on the notch scales together: the rings, the number under each "
+                 + "one, the grip, and the thin edge it collapses to. The notch is rebuilt at "
+                 + "the new size as you drag, so an edge that no longer has room for it will "
+                 + "hand it to another one.")
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
     private var screenPreview: some View {
         ZStack(alignment: positionAlignment) {
             RoundedRectangle(cornerRadius: 7, style: .continuous)
@@ -597,10 +639,13 @@ struct AppearanceView: View {
                                               Color(red: 0.08, green: 0.13, blue: 0.16)],
                                      startPoint: .topLeading, endPoint: .bottomTrailing))
             if let placement = store.placement {
+                // Scaled by the same factor the notch is, so the slider can be seen
+                // doing something without hunting for the notch on the screen edge.
+                let scale = store.notchSize.scale
                 RoundedRectangle(cornerRadius: 5, style: .continuous)
                     .fill(.black)
-                    .frame(width: placement.isHorizontal ? 62 : 15,
-                           height: placement.isHorizontal ? 15 : 56)
+                    .frame(width: (placement.isHorizontal ? 62 : 15) * scale,
+                           height: (placement.isHorizontal ? 15 : 56) * scale)
                     .padding(3)
             }
         }
