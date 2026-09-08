@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 import SwiftUI
 import BrimCore
 
@@ -111,13 +112,19 @@ struct NotchMetrics {
 struct EdgeNotchShape: Shape {
     var placement: NotchAnchor = .right
     var endCapDepth: CGFloat?
+    /// The smallest the flared ends may become. Their depth is otherwise a fraction
+    /// of the notch's thickness, which is right at full width but flattens them into
+    /// nothing as the notch folds down to a handle. One shape is now drawn at every
+    /// width between the two, so it needs a floor rather than a second set of
+    /// figures for the folded end of that range.
+    var minCapDepth: CGFloat = 0
     func path(in rect: CGRect) -> Path {
         let w = placement.isHorizontal ? rect.height : rect.width
         let h = placement.isHorizontal ? rect.width : rect.height
         let scale = w / 92
         // Keep the curved ends visible when the notch becomes a thin handle.
         // Scaling both axes from its width would flatten them into tiny corners.
-        let cap = min(h / 2, endCapDepth ?? 56 * scale)
+        let cap = min(h / 2, max(minCapDepth, endCapDepth ?? 56 * scale))
         let shoulder = cap * 24 / 56
         var p = Path()
         p.move(to: CGPoint(x: w, y: 0))
@@ -138,6 +145,10 @@ struct EdgeNotchShape: Shape {
 
 struct NotchView: View {
     @ObservedObject var store: UsageStore
+    /// The open/folded state, shared with the shell around this view rather than held
+    /// here. Both animate off the same change, and neither is rebuilt when it flips,
+    /// which is what lets the motion run instead of restarting.
+    @ObservedObject var reveal: NotchRevealModel
     let placement: NotchAnchor
     var onHover: (TrackedTool, Bool) -> Void
     var openDashboard: () -> Void
@@ -146,10 +157,6 @@ struct NotchView: View {
     var onKeepOpen: () -> Void
     var onHide: (TrackedTool) -> Void
     var onSlide: (CGPoint, NotchSlidePhase) -> Void
-    /// Off for offscreen rendering: `onAppear` never fires for a view that is never
-    /// in a window, so the reveal would never complete and the capture would be blank.
-    var animateReveal = true
-    @State private var revealed = false
     @State private var openHovered = false
     /// Read from the store rather than passed in, so changing the size in Settings
     /// redraws the notch the same way changing anything else on it does.
@@ -160,9 +167,15 @@ struct NotchView: View {
 
     var body: some View {
         let metrics = self.metrics
-        let sideBySide = metrics.laysSideBySide(anchor: placement, toolCount: store.activeTools.count)
-        let ringLine = metrics.ringLineOffset(anchor: placement, toolCount: store.activeTools.count)
+        let tools = store.activeTools
+        let sideBySide = metrics.laysSideBySide(anchor: placement, toolCount: tools.count)
+        let ringLine = metrics.ringLineOffset(anchor: placement, toolCount: tools.count)
         let layout = placement.isHorizontal ? AnyLayout(HStackLayout(spacing: metrics.edgeSpacing)) : AnyLayout(VStackLayout(spacing: metrics.edgeSpacing))
+        // Everything on the strip arrives in sequence, counted from the anchored end
+        // outwards, so the contents read as one wave travelling out of the screen
+        // edge rather than as rings appearing on top of furniture that was already
+        // there. The grip and the button used to snap in while only the rings
+        // animated, which is what made the open look half-finished.
         layout {
             // The grip is a member of the stack rather than an overlay sitting on
             // padding reserved for it. As an overlay only the leading end held a
@@ -172,27 +185,21 @@ struct NotchView: View {
                 .frame(width: placement.isHorizontal ? metrics.gripThickness : metrics.gripBreadth,
                        height: placement.isHorizontal ? metrics.gripBreadth : metrics.gripThickness)
                 .offset(y: -ringLine)
-            // The rings arrive in sequence rather than all at once. The stagger is
-            // small, a few frames apart, because the notch opens on hover and a
-            // slower one would still be animating when the pointer arrives.
-            ForEach(Array(store.activeTools.enumerated()), id: \.element) { index, tool in
-                item(tool, sideBySide: sideBySide)
-                    .opacity(revealed || !animateReveal ? 1 : 0)
-                    .scaleEffect(revealed || !animateReveal ? 1 : 0.82)
-                    .animation(reduceMotion ? nil
-                               : .spring(response: 0.32, dampingFraction: 0.8)
-                                   .delay(Double(index) * 0.035),
-                               value: revealed)
+                .modifier(reveal(at: 0))
+            ForEach(Array(tools.enumerated()), id: \.element) { index, tool in
+                item(tool, sideBySide: sideBySide).modifier(reveal(at: index + 1))
             }
-            openButton.offset(y: -ringLine)
+            openButton.offset(y: -ringLine).modifier(reveal(at: tools.count + 1))
         }.padding(.leading, placement.isHorizontal ? metrics.leadingPadding : 0)
             .padding(.trailing, placement.isHorizontal ? metrics.trailingPadding : 0)
             .padding(.top, placement.isHorizontal ? metrics.crossPadding : metrics.leadingPadding)
             .padding(.bottom, placement.isHorizontal ? metrics.crossPadding : metrics.trailingPadding)
             .frame(width: placement.isHorizontal ? nil : metrics.edgeWidth)
-            .background(EdgeNotchShape(placement: placement).fill(.black))
-            .foregroundStyle(.white).preferredColorScheme(.dark)
-            .onAppear { revealed = true }
+    }
+
+    private func reveal(at index: Int) -> NotchReveal {
+        NotchReveal(isExpanded: self.reveal.isExpanded, index: index,
+                    placement: placement, reduceMotion: reduceMotion)
     }
 
     /// The way into the app.
@@ -274,30 +281,270 @@ struct NotchView: View {
     }
 }
 
-struct CollapsedNotchView: View {
+/// Whether the notch is open, shared by the window and everything drawn in it.
+///
+/// A reference type on purpose. The reveal is one continuous motion across two
+/// animation systems — AppKit resizing the panel, SwiftUI fading the contents in —
+/// and both have to be reacting to the same flag rather than to a view being rebuilt
+/// underneath them.
+@MainActor
+final class NotchRevealModel: ObservableObject {
+    @Published var isExpanded: Bool
+    init(isExpanded: Bool) { self.isExpanded = isExpanded }
+}
+
+/// One rule for everything that has to appear when the notch opens.
+///
+/// Folding away is deliberately not this motion in reverse. A staggered exit reads as
+/// hesitation, and the contents have to be gone well before the window has finished
+/// shrinking, or the closing frames show them cut off by an edge sliding across them.
+struct NotchReveal: ViewModifier {
+    let isExpanded: Bool
+    let index: Int
     let placement: NotchAnchor
-    /// Passed in rather than derived: on a notched Mac the collapsed top notch is
-    /// exactly the hardware notch, which is a property of the display.
-    let size: CGSize
-    /// Required rather than defaulted: a collapsed notch drawn at the designed size
-    /// inside a frame sized for a larger one is the kind of mismatch nothing catches.
+    let reduceMotion: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .opacity(isExpanded ? 1 : 0)
+            .scaleEffect(isExpanded ? 1 : 0.84)
+            .offset(x: isExpanded ? 0 : tucked.width, y: isExpanded ? 0 : tucked.height)
+            .animation(animation, value: isExpanded)
+    }
+
+    /// Where a hidden item sits: a few points *into* the screen edge, so it comes out
+    /// of the edge with the notch rather than fading up where it will end up.
+    private var tucked: CGSize {
+        let depth: CGFloat = 8
+        switch placement {
+        case .right: return CGSize(width: depth, height: 0)
+        case .left: return CGSize(width: -depth, height: 0)
+        case .top: return CGSize(width: 0, height: -depth)
+        case .bottom: return CGSize(width: 0, height: depth)
+        }
+    }
+
+    /// Honoured rather than assumed: an edge notch that pops open is exactly the kind
+    /// of motion people turn this off to avoid.
+    private var animation: Animation? {
+        guard !reduceMotion else { return nil }
+        guard isExpanded else { return .easeIn(duration: 0.1) }
+        // Behind the silhouette, not with it. The head start is measured rather than
+        // chosen: the shape's flared shoulders reach roughly their final width three
+        // hundredths in, and anything drawn before that lands outside the silhouette
+        // and shows as ink floating on the desktop, since the window itself is a
+        // rectangle and cannot mask it. The stagger after it stays a couple of
+        // frames, because the notch opens on hover and a slower wave would still be
+        // running when the pointer reaches the rings.
+        return .spring(response: 0.3, dampingFraction: 0.84).delay(0.09 + Double(index) * 0.028)
+    }
+}
+
+/// The panel's whole content, in both states at once.
+///
+/// The window used to swap one view for the other the instant the notch opened or
+/// folded and then animate its frame around whatever was now installed, so the
+/// expanded layout spent the entire animation being squeezed into a window far too
+/// small for it and sprang out at the end. Nothing is swapped here. The silhouette is
+/// drawn to whatever size the window currently is, and the contents are laid out once
+/// at their full size and pinned to the anchored edge, so the window growing
+/// *uncovers* them instead of compressing them, and shrinking covers them again.
+struct NotchShellView: View {
+    @ObservedObject var reveal: NotchRevealModel
+    let placement: NotchAnchor
     let metrics: NotchMetrics
-    let expand: () -> Void
+    /// The size the contents are drawn at, whatever the window is doing. Passed in
+    /// rather than measured here: the panel already knows it, and a shell that
+    /// disagreed with the frame it is inside would slide as the window resized.
+    let expandedSize: CGSize
+    let content: NotchView
+    var expand: () -> Void = {}
+    private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
     var body: some View {
         let pill = metrics.collapsedPill
-        return Button(action: expand) {
-            EdgeNotchShape(placement: placement, endCapDepth: metrics.collapsedCapDepth).fill(.black)
-                .overlay(Capsule().fill(.white.opacity(0.4))
+        let expanded = reveal.isExpanded
+        EdgeNotchShape(placement: placement, minCapDepth: metrics.collapsedCapDepth)
+            .fill(.black)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // The handle's pill is centred on the window, not on the contents, so it
+            // stays in the middle of the strip the whole way down.
+            .overlay {
+                Capsule().fill(.white.opacity(0.4))
                     .frame(width: placement.isHorizontal ? pill.width : pill.height,
-                           height: placement.isHorizontal ? pill.height : pill.width))
-                .frame(width: size.width, height: size.height)
-                // The collapsed notch can be 12pt across. The hit area is padded well
-                // past the artwork so it can actually be hit.
-                .contentShape(Rectangle().inset(by: -10))
-        }.buttonStyle(.plain)
+                           height: placement.isHorizontal ? pill.height : pill.width)
+                    .opacity(expanded ? 0 : 1)
+                    .animation(reduceMotion ? nil : pillFade, value: expanded)
+            }
+            .overlay(alignment: contentAlignment) {
+                content.frame(width: expandedSize.width, height: expandedSize.height)
+                    // Most of the contents hang outside a folded window, but the strip
+                    // that does not would otherwise take the hover meant for the
+                    // handle underneath it.
+                    .allowsHitTesting(expanded)
+            }
+            .overlay { if !expanded { expandTarget } }
+            .foregroundStyle(.white).preferredColorScheme(.dark)
+    }
+
+    /// Out at once when opening, and back only once the window has begun to close, so
+    /// the pill is never drawn across contents that are still on their way out.
+    private var pillFade: Animation {
+        reveal.isExpanded ? .easeOut(duration: 0.1) : .easeOut(duration: 0.16).delay(0.08)
+    }
+
+    /// The contents are pinned to the edge the notch is attached to, so the window's
+    /// far side is the one that travels and nothing shifts sideways as it does.
+    private var contentAlignment: Alignment {
+        switch placement {
+        case .right: .trailing
+        case .left: .leading
+        case .top: .top
+        case .bottom: .bottom
+        }
+    }
+
+    /// The folded notch can be 12pt across. The whole window is the target, padded
+    /// past the artwork so it can actually be hit.
+    private var expandTarget: some View {
+        Button(action: expand) { Color.clear.contentShape(Rectangle().inset(by: -10)) }
+            .buttonStyle(.plain)
             .onHover { if $0 { expand() } }
             .help("Hover or click to expand Brim")
             .accessibilityLabel("Expand Brim")
+    }
+}
+
+/// The hover card, wrapped in the motion that brings it out of the notch.
+///
+/// The card used to be ordered in and out of existence: it appeared whole, at full
+/// size, a fixed gap away from a ring, with nothing tying it to the notch it had come
+/// from. It now grows out of the edge the notch is attached to — scaled from the side
+/// facing it, and starting a little way inside it — so the notch reads as the thing
+/// that produced it.
+///
+/// The shadow moved in here with it. A window shadow is derived from the window's
+/// shape and is not recomputed as its contents are redrawn, so an AppKit one stayed
+/// the size of the finished card while the card was still growing into it.
+struct HoverCardView: View {
+    /// Room left around the card for the shadow to fall into. The window is that much
+    /// larger than the card on every side, and the card is centred in it.
+    static let shadowMargin: CGFloat = 36
+
+    @ObservedObject var reveal: NotchRevealModel
+    let placement: NotchAnchor
+    let content: HoverDetailView
+    private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
+
+    var body: some View {
+        let shown = reveal.isExpanded
+        content
+            // Before the transforms, so the shadow grows with the card rather than
+            // sitting under it at full size from the first frame.
+            .shadow(color: .black.opacity(0.55), radius: 22, y: 10)
+            .scaleEffect(shown ? 1 : 0.9, anchor: notchSide)
+            .offset(x: shown ? 0 : tucked.width, y: shown ? 0 : tucked.height)
+            .opacity(shown ? 1 : 0)
+            // After them: `padding` is layout and the transforms are not, so this sets
+            // the window's size while leaving the scale anchored on the card's own
+            // edge rather than on the margin around it.
+            .padding(Self.shadowMargin)
+            .animation(animation, value: shown)
+    }
+
+    /// The side of the card facing the notch. Everything scales away towards it.
+    private var notchSide: UnitPoint {
+        switch placement {
+        case .right: .trailing
+        case .left: .leading
+        case .top: .top
+        case .bottom: .bottom
+        }
+    }
+
+    /// Where the card starts from: a little way back inside the notch.
+    private var tucked: CGSize {
+        let depth: CGFloat = 14
+        switch placement {
+        case .right: return CGSize(width: depth, height: 0)
+        case .left: return CGSize(width: -depth, height: 0)
+        case .top: return CGSize(width: 0, height: -depth)
+        case .bottom: return CGSize(width: 0, height: depth)
+        }
+    }
+
+    /// Out on a spring, back on a plain curve and faster. Going away is not worth
+    /// watching, and the pointer has usually already left for something else.
+    private var animation: Animation? {
+        guard !reduceMotion else { return nil }
+        return reveal.isExpanded ? .spring(response: 0.32, dampingFraction: 0.82)
+                                 : .easeIn(duration: 0.12)
+    }
+}
+
+/// The curves the panel resizes on.
+///
+/// Two, not one, because opening and folding are answering different things. Written
+/// as plain functions of progress so the frame animator can be handed either.
+enum NotchEase {
+    /// Opening. Leaves immediately and settles in: someone who has just moved the
+    /// pointer onto the edge has to see it answer on the first frame, so this cannot
+    /// start from rest.
+    static func opening(_ t: Double) -> Double { 1 - pow(1 - t, 4) }
+    /// Folding away. Eases in as well as out. Nothing is waiting on it, and a sharp
+    /// start pulls the eye back to a notch the user has finished with.
+    static func folding(_ t: Double) -> Double {
+        t < 0.5 ? 4 * t * t * t : 1 - pow(-2 * t + 2, 3) / 2
+    }
+}
+
+/// Drives the panel's frame rather than handing it to `NSAnimationContext`.
+///
+/// The window animator runs a short, evenly paced resize that cannot be steered or
+/// interrupted, so a pointer that arrived and left quickly queued two of them back to
+/// back and the notch stuttered between the two sizes. This ticks on the display's own
+/// clock, eases with a curve chosen per direction, and starts a new animation from
+/// wherever the previous one had reached.
+@MainActor
+final class NotchFrameAnimator {
+    private var link: CADisplayLink?
+    private weak var window: NSWindow?
+    private var from = NSRect.zero
+    private var to = NSRect.zero
+    private var startedAt: CFTimeInterval = 0
+    private var duration: CFTimeInterval = 0
+    private var easing: (Double) -> Double = NotchEase.opening
+
+    func animate(_ window: NSWindow, to frame: NSRect, duration: CFTimeInterval,
+                 easing: @escaping (Double) -> Double) {
+        stop()
+        guard window.isVisible, duration > 0, window.frame != frame else {
+            window.setFrame(frame, display: true); return
+        }
+        self.window = window; from = window.frame; to = frame
+        self.duration = duration; self.easing = easing
+        startedAt = CACurrentMediaTime()
+        let link = window.displayLink(target: self, selector: #selector(tick))
+        link.add(to: .main, forMode: .common)
+        self.link = link
+    }
+
+    /// Also the way anything else takes the frame back: a drag, or a screen change,
+    /// must not have an animation writing over it a frame later.
+    func stop() {
+        link?.invalidate(); link = nil; window = nil
+    }
+
+    @objc private func tick() {
+        guard let window else { stop(); return }
+        let elapsed = min(1, (CACurrentMediaTime() - startedAt) / duration)
+        let p = CGFloat(elapsed >= 1 ? 1 : easing(elapsed))
+        window.setFrame(NSRect(x: from.minX + (to.minX - from.minX) * p,
+                               y: from.minY + (to.minY - from.minY) * p,
+                               width: from.width + (to.width - from.width) * p,
+                               height: from.height + (to.height - from.height) * p),
+                        display: true)
+        if elapsed >= 1 { stop() }
     }
 }
 
@@ -375,7 +622,18 @@ final class NotchController {
     let store: UsageStore
     private var panel: PassivePanel?
     private var detail: PassivePanel?
+    /// The card's own reveal flag and animator. Separate from the notch's: the card
+    /// can be arriving while the notch is still opening, and one of each would have
+    /// them stepping on one another.
+    private let cardReveal = NotchRevealModel(isExpanded: false)
+    private let cardAnimator = NotchFrameAnimator()
+    /// The card without the margin the shadow falls into. The window is larger than
+    /// what anyone can see, and the pointer test has to use what they can see.
+    private var cardFrame: NSRect?
     private var hideWork: DispatchWorkItem?
+    /// Ordering the window away once the card has finished retracting. Separate from
+    /// `hideWork`, which is the wait *before* it starts.
+    private var dismissWork: DispatchWorkItem?
     private var screenObserver: NSObjectProtocol?
     private var layoutTimer: Timer?
     private var hoverTimer: Timer?
@@ -388,10 +646,15 @@ final class NotchController {
     private var slidePosition: NotchPosition?
     private var isSliding: Bool { dragSession != nil }
     private var revealState = NotchRevealState(collapseWhenIdle: false)
+    /// The same flag the SwiftUI side animates off. `revealState` remains the one that
+    /// decides; this is how the decision reaches the window's contents.
+    private let reveal = NotchRevealModel(isExpanded: true)
+    private let frameAnimator = NotchFrameAnimator()
     private var isVisible: Bool { store.notchVisible }
     private var openDashboard: () -> Void
     private var openConnections: () -> Void
     private var targetScreen: NSScreen? { ScreenGeometry.target }
+    private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
     private var metrics: NotchMetrics { NotchMetrics(store.notchSize) }
 
     init(store: UsageStore, openDashboard: @escaping () -> Void, openConnections: @escaping () -> Void) {
@@ -422,8 +685,11 @@ final class NotchController {
     func rebuild() {
         NotchPositionControl.cancelActiveDrag()
         clearSlide()
+        frameAnimator.stop()
         hoverTimer?.invalidate(); hoverTimer = nil
-        hideWork?.cancel(); panel?.close(); detail?.close(); detail = nil; panel = nil
+        hideWork?.cancel(); dismissWork?.cancel(); cardAnimator.stop()
+        cardReveal.isExpanded = false; cardFrame = nil
+        panel?.close(); detail?.close(); detail = nil; panel = nil
         anchor = nil
         lastLayout = nil
         revealState = NotchRevealState(collapseWhenIdle: store.collapseWhenIdle)
@@ -437,7 +703,7 @@ final class NotchController {
     }
 
     private func fullView(at anchor: NotchAnchor) -> NotchView {
-        NotchView(store: store, placement: anchor, onHover: { [weak self] tool, inside in
+        NotchView(store: store, reveal: reveal, placement: anchor, onHover: { [weak self] tool, inside in
             if inside { self?.showDetail(tool) } else { self?.scheduleHide() }
         }, openDashboard: openDashboard, openUsage: { [weak self] tool in self?.openUsage(tool) },
                   onRefresh: { [weak self] tool in self?.store.refresh(tool) },
@@ -451,22 +717,40 @@ final class NotchController {
     private func keepOpen(for duration: TimeInterval = 300) {
         store.noteActivity()
         revealState.keepOpen(until: Date().addingTimeInterval(duration))
-        installContent()
+        applyReveal()
         updateLayout(force: true, animate: true)
     }
 
+    /// The size the window should currently be. Both states are laid out by the same
+    /// shell, so opening and folding no longer need the contents remeasured — only
+    /// this, and a frame to grow or shrink into.
+    private func targetSize(for anchor: NotchAnchor) -> CGSize {
+        revealState.isExpanded ? expandedSize(for: anchor) : collapsedSize(for: anchor)
+    }
+
+    private func expandedSize(for anchor: NotchAnchor) -> CGSize {
+        anchor.isHorizontal ? horizontalSize : sideSize
+    }
+
+    /// Hands the new state to the contents. Called instead of rebuilding them: the
+    /// animation depends on the same views being there before and after.
+    private func applyReveal() {
+        guard let panel, let anchor else { return }
+        reveal.isExpanded = revealState.isExpanded
+        presentedSize = targetSize(for: anchor)
+        panel.title = revealState.isExpanded ? "Brim" : "Brim edge"
+    }
+
+    /// Builds the window's contents. Only for a panel that has just been made or has
+    /// moved to another edge; opening and folding go through `applyReveal`.
     private func installContent() {
         guard let panel, let anchor else { return }
-        let view: AnyView
-        if revealState.isExpanded {
-            view = AnyView(fullView(at: anchor))
-        } else {
-            view = AnyView(CollapsedNotchView(placement: anchor, size: collapsedSize(for: anchor),
-                                              metrics: metrics,
-                                              expand: { [weak self] in self?.expand() }))
-        }
-        let host = NSHostingView(rootView: view)
-        presentedSize = host.fittingSize
+        let host = NSHostingView(rootView: NotchShellView(
+            reveal: reveal, placement: anchor, metrics: metrics,
+            expandedSize: expandedSize(for: anchor), content: fullView(at: anchor),
+            expand: { [weak self] in self?.expand() }))
+        reveal.isExpanded = revealState.isExpanded
+        presentedSize = targetSize(for: anchor)
         host.sizingOptions = []
         // A hosting view set straight onto the panel negotiates its own size with the
         // window and can shrink it when the content briefly reports a smaller fitting
@@ -479,6 +763,12 @@ final class NotchController {
         shell.addSubview(host)
         panel.contentView = shell
         panel.title = revealState.isExpanded ? "Brim" : "Brim edge"
+    }
+
+    /// How long the frame takes, and on which curve. Opening is the longer of the two
+    /// because it has further to travel and something to show at the end of it.
+    private var frameMotion: (duration: CFTimeInterval, easing: (Double) -> Double) {
+        revealState.isExpanded ? (0.3, NotchEase.opening) : (0.22, NotchEase.folding)
     }
 
     private func collapsedSize(for anchor: NotchAnchor) -> CGSize {
@@ -502,7 +792,7 @@ final class NotchController {
         // Opening the notch is someone looking at their limits. Ask for a current
         // reading now rather than showing whatever the last tick happened to fetch.
         store.refreshForDisplay()
-        installContent(); updateLayout(force: true, animate: true)
+        applyReveal(); updateLayout(force: true, animate: true)
         guard store.collapseWhenIdle else { return }
         let timer = Timer(timeInterval: 0.1, repeats: true) { [weak self] _ in
             Task { @MainActor in self?.trackPointer() }
@@ -520,11 +810,11 @@ final class NotchController {
         let inNotch = panel.isVisible && panel.occlusionState.contains(.visible)
             && panel.frame.insetBy(dx: corridor, dy: corridor).contains(point)
         let inDetail = detail.map { $0.isVisible && $0.occlusionState.contains(.visible)
-            && $0.frame.insetBy(dx: corridor, dy: corridor).contains(point) } ?? false
+            && (cardFrame ?? $0.frame).insetBy(dx: corridor, dy: corridor).contains(point) } ?? false
         guard revealState.updatePointer(isInside: inNotch || inDetail || store.controlsMenuOpen, now: Date()) else { return }
         hoverTimer?.invalidate(); hoverTimer = nil
-        hideWork?.cancel(); detail?.orderOut(nil)
-        installContent(); updateLayout(force: true, animate: true)
+        hideDetail(animated: false)
+        applyReveal(); updateLayout(force: true, animate: true)
     }
 
     private var currentLayout: NotchScreenLayout? { ScreenGeometry.current }
@@ -532,7 +822,7 @@ final class NotchController {
     private func updateLayout(force: Bool = false, animate: Bool = false) {
         guard let panel, let layout = currentLayout else {
             clearSlide()
-            self.panel?.orderOut(nil); detail?.orderOut(nil); lastLayout = nil
+            self.panel?.orderOut(nil); hideDetail(animated: false); lastLayout = nil
             store.setAutomaticPlacement(nil); return
         }
         if let slidePosition,
@@ -544,7 +834,7 @@ final class NotchController {
                                                     sideSize: sideSize, horizontalSize: horizontalSize) else {
             anchor = nil; lastLayout = nil
             store.setAutomaticPlacement(nil)
-            panel.orderOut(nil); detail?.orderOut(nil); return
+            panel.orderOut(nil); hideDetail(animated: false); return
         }
         let chosen = position.anchor
         let movedToAnotherEdge = anchor != chosen
@@ -559,20 +849,21 @@ final class NotchController {
         }
         guard force || movedToAnotherEdge || layout != lastLayout else { return }
         lastLayout = layout
-        hideWork?.cancel(); detail?.orderOut(nil)
-        let expandedSize = chosen.isHorizontal ? horizontalSize : sideSize
+        hideDetail(animated: false)
         guard isVisible, let frame = layout.notchFrame(size: presentedSize, anchor: chosen,
-                                                      fraction: position.fraction, expandedSize: expandedSize) else {
-            panel.orderOut(nil); return
+                                                      fraction: position.fraction,
+                                                      expandedSize: expandedSize(for: chosen)) else {
+            frameAnimator.stop(); panel.orderOut(nil); return
         }
         let shouldAnimate = animate && !movedToAnotherEdge && panel.isVisible
             && !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion
         if shouldAnimate {
-            NSAnimationContext.runAnimationGroup { context in
-                context.duration = 0.16
-                panel.animator().setFrame(frame, display: true)
-            }
+            let motion = frameMotion
+            frameAnimator.animate(panel, to: frame, duration: motion.duration, easing: motion.easing)
         } else {
+            // A drag, a screen change or a reduced-motion open takes the frame back
+            // outright. Leaving an animation running would write over it a frame later.
+            frameAnimator.stop()
             panel.setFrame(frame, display: true)
         }
         panel.orderFrontRegardless()
@@ -585,7 +876,7 @@ final class NotchController {
                   let position = layout.resolvedPosition(preferred: store.preferredPosition,
                                                          sideSize: sideSize, horizontalSize: horizontalSize) else { return }
             dragSession = NotchDragSession(position: position, pointer: point); slidePosition = position
-            hideWork?.cancel(); detail?.orderOut(nil)
+            hideDetail(animated: false)
         case .moved, .ended:
             guard var session = dragSession, let layout = currentLayout else { return }
             guard let position = session.update(at: point, layout: layout, sideSize: sideSize, horizontalSize: horizontalSize) else {
@@ -609,41 +900,90 @@ final class NotchController {
 
     func stop() {
         NotchPositionControl.cancelActiveDrag()
-        layoutTimer?.invalidate(); hoverTimer?.invalidate(); hideWork?.cancel()
+        frameAnimator.stop(); cardAnimator.stop()
+        layoutTimer?.invalidate(); hoverTimer?.invalidate()
+        hideWork?.cancel(); dismissWork?.cancel()
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
         panel?.close(); detail?.close()
     }
 
     private func showDetail(_ tool: TrackedTool) {
-        hideWork?.cancel()
+        hideWork?.cancel(); dismissWork?.cancel()
         store.refreshForDisplay()
         updateLayout()
         guard !isSliding, isVisible, revealState.isExpanded, let panel, panel.isVisible, let anchor, let layout = currentLayout else { return }
         let content = HoverDetailView(store: store, tool: tool, hover: { [weak self] inside in
             if inside { self?.hideWork?.cancel() } else { self?.scheduleHide() }
-        }, connect: { [weak self] in self?.detail?.orderOut(nil); self?.openConnections() },
+        }, connect: { [weak self] in self?.hideDetail(animated: false); self?.openConnections() },
            openUsage: { [weak self] in self?.openUsage(tool) })
-        let host = NSHostingView(rootView: content)
-        let size = host.fittingSize
+        // The card is measured on its own and the margin added afterwards, so the
+        // gap the layout leaves is still the gap between the notch and the card, not
+        // between the notch and the empty room the shadow needs.
+        let size = NSHostingView(rootView: content).fittingSize
         let index = store.activeTools.firstIndex(of: tool) ?? 0
         // Asked of the metrics rather than recomputed here: a typed 56 once drifted
         // from the real item width, and the item is not one fixed size any more.
         let itemCenter = metrics.itemCenter(index: index, anchor: anchor, toolCount: store.activeTools.count)
-        guard let frame = layout.detailFrame(size: size, notchFrame: panel.frame, anchor: anchor, itemCenterFromTop: itemCenter) else { detail?.orderOut(nil); return }
+        guard let card = layout.detailFrame(size: size, notchFrame: panel.frame, anchor: anchor, itemCenterFromTop: itemCenter) else {
+            hideDetail(animated: false); return
+        }
+        let margin = HoverCardView.shadowMargin
+        let frame = card.insetBy(dx: -margin, dy: -margin)
+        cardFrame = card
+        let host = NSHostingView(rootView: HoverCardView(reveal: cardReveal, placement: anchor, content: content))
+        host.sizingOptions = []
+        host.frame = NSRect(origin: .zero, size: frame.size)
+        // Already out, for another ring: it travels rather than being dismissed and
+        // put back. The size is taken at once and only the position is animated,
+        // because a window resizing under a card makes the card reflow the whole way.
+        let travelling = detail?.isVisible == true && cardReveal.isExpanded
         if detail == nil { detail = makeDetailPanel(frame: frame) }
-        host.frame = NSRect(origin: .zero, size: size)
-        detail?.contentView = host; detail?.setFrame(frame, display: true)
-        detail?.orderFrontRegardless()
+        guard let detail else { return }
+        detail.contentView = host
+        cardAnimator.stop()
+        if travelling, !reduceMotion {
+            detail.setFrame(NSRect(origin: detail.frame.origin, size: frame.size), display: true)
+            cardAnimator.animate(detail, to: frame, duration: 0.2, easing: NotchEase.folding)
+        } else {
+            detail.setFrame(frame, display: true)
+        }
+        detail.orderFrontRegardless()
+        guard !travelling else { return }
+        // Held back a turn on purpose. Set in the same pass that installs the view,
+        // the change would land before anything had been drawn and the card would
+        // simply be there, at full size, with nothing to animate from.
+        cardReveal.isExpanded = false
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.detail?.isVisible == true else { return }
+            self.cardReveal.isExpanded = true
+        }
     }
 
     private func scheduleHide() {
         hideWork?.cancel()
-        let work = DispatchWorkItem { [weak self] in self?.detail?.orderOut(nil) }
+        let work = DispatchWorkItem { [weak self] in self?.hideDetail(animated: true) }
         hideWork = work; DispatchQueue.main.asyncAfter(deadline: .now() + 0.3, execute: work)
+    }
+
+    /// Takes the card away. Animated when it is simply no longer wanted, and outright
+    /// when something else has taken over the screen — a drag, the notch folding, a
+    /// display change — where watching it retract from a position that no longer
+    /// exists would be worse than it going.
+    private func hideDetail(animated: Bool) {
+        hideWork?.cancel(); dismissWork?.cancel(); cardAnimator.stop()
+        let wasShowing = cardReveal.isExpanded
+        cardReveal.isExpanded = false
+        cardFrame = nil
+        guard animated, wasShowing, !reduceMotion, detail?.isVisible == true else {
+            detail?.orderOut(nil); return
+        }
+        let work = DispatchWorkItem { [weak self] in self?.detail?.orderOut(nil) }
+        dismissWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14, execute: work)
     }
     private func openUsage(_ tool: TrackedTool) {
         guard let provider = tool.builtin else { return }
-        hideWork?.cancel(); detail?.orderOut(nil)
+        hideDetail(animated: false)
         store.openUsage?(provider)
     }
     /// The hover card, which is a different kind of window from the notch.
@@ -656,7 +996,8 @@ final class NotchController {
     private func makeDetailPanel(frame: NSRect) -> PassivePanel {
         let panel = makePanel(frame: frame)
         panel.level = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
-        panel.hasShadow = true
+        // Drawn by the card itself now, so it grows with it. See `HoverCardView`.
+        panel.hasShadow = false
         return panel
     }
 
