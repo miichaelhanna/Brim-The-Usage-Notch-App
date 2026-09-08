@@ -1,6 +1,5 @@
 import AppKit
 import SwiftUI
-import ServiceManagement
 import BrimCore
 
 /// The window is built the way System Settings is: a source list on the left, and
@@ -527,7 +526,10 @@ struct ConnectionsView: View {
 
 struct AppearanceView: View {
     @ObservedObject var store: UsageStore
-    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var launchAtLogin = LoginItem.isEnabled
+    /// Registered, then switched off by hand in System Settings. Brim cannot turn that
+    /// back on, so the switch says where the decision lives instead of failing quietly.
+    @State private var loginNeedsApproval = LoginItem.needsApproval
 
     /// The one edge that cannot be chosen. Read each time the view draws, so moving the
     /// Dock while this is open updates which edge is unavailable.
@@ -713,23 +715,45 @@ struct AppearanceView: View {
         }
     }
 
+    private func readLoginItem() {
+        launchAtLogin = LoginItem.isEnabled
+        loginNeedsApproval = LoginItem.needsApproval
+    }
+
     private var general: some View {
         Section {
             Toggle("Refresh Codex every minute", isOn: $store.autoRefresh)
             Toggle("Open at login", isOn: Binding(get: { launchAtLogin }, set: { value in
                 do {
-                    if value { try SMAppService.mainApp.register() }
-                    else { try SMAppService.mainApp.unregister() }
-                    launchAtLogin = SMAppService.mainApp.status == .enabled
+                    try LoginItem.set(value)
                 } catch {
-                    store.notice = "Couldn’t change login startup. Move Brim to Applications and try again."
+                    // Two different failures, and the fix for one is no help for the other.
+                    store.notice = LoginItem.needsApproval
+                        ? "macOS is holding Brim off. Allow it in System Settings › General › Login Items."
+                        : "Couldn’t change login startup. Move Brim to Applications and try again."
                 }
+                readLoginItem()
             }))
+            if loginNeedsApproval {
+                HStack {
+                    Text("macOS is holding this off. Allow Brim under Login Items.")
+                        .font(.callout).foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer(minLength: 14)
+                    Button("Open Login Items") { LoginItem.openSystemSettings() }
+                }
+            }
         } header: {
             Text("General")
         } footer: {
-            Text("Brim \(AppVersion.current)")
+            Text("Brim is only in the menu bar, so it has to be running to be there. "
+                 + "Opening at login is how it comes back after a restart.\n\nBrim \(AppVersion.current)")
         }
+        // The state lives in System Settings, where it can change while this window is
+        // open, so it is read again rather than remembered from when the view was made.
+        .onAppear(perform: readLoginItem)
+        .onReceive(NotificationCenter.default.publisher(
+            for: NSApplication.didBecomeActiveNotification)) { _ in readLoginItem() }
     }
 }
 

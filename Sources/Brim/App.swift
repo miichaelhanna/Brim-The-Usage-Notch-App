@@ -1,5 +1,4 @@
 import AppKit
-import ServiceManagement
 import SwiftUI
 import BrimCore
 
@@ -101,14 +100,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
         store.start()
         applyPresence()
+        // A usage meter that is not running is not a meter: the point of it is being
+        // there before you think to look. Asserted on every launch rather than the
+        // first, so a registration that failed once, or that points at a copy of Brim
+        // which has since moved, is repaired by the next launch instead of leaving the
+        // menu bar empty after every restart. Turning it off in Settings is remembered.
+        LoginItem.assertRegistered()
         if !UserDefaults.standard.bool(forKey: "hasLaunched") {
             // First run leads with what was found, not with an empty dashboard.
             navigation.showWelcome = true
             showDashboard()
-            // A usage meter that is not running is not a meter: the point of it is being
-            // there before you think to look. Registered on the first launch only, so
-            // turning it off in Settings stays off rather than coming back next time.
-            try? SMAppService.mainApp.register()
             UserDefaults.standard.set(true, forKey: "hasLaunched")
         } else if CommandLine.arguments.contains("--show") {
             showDashboard()
