@@ -18,7 +18,9 @@ cd "$(dirname "$0")/.."
 VERSION="$(tr -d '[:space:]' < VERSION)"
 BUILD="${BUILD_NUMBER:-$(date +%Y%m%d%H%M)}"
 APP="dist/Brim.app"
-DMG_PATH="dist/Brim $VERSION.dmg"
+# No space in the file name. GitHub rewrites a space in a release asset to a dot, so
+# "Brim 1.0.0.dmg" is offered for download as "Brim.1.0.0.dmg".
+DMG_PATH="dist/Brim-$VERSION.dmg"
 NOTARIZE="${NOTARIZE:-0}"
 DMG="${DMG:-0}"
 # The keychain label the notarytool credential was stored under. It predates the
