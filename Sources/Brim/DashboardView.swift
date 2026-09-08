@@ -125,6 +125,13 @@ struct DashboardView: View {
             // keeps its own appearance control out of the panes it affects.
             VStack(spacing: 0) {
                 Divider()
+                Text(versionLabel)
+                    .font(.system(size: 10)).monospacedDigit()
+                    .foregroundStyle(.secondary)
+                    // Worth being able to copy: it is the first thing an issue asks for.
+                    .textSelection(.enabled)
+                    .padding(.top, 9)
+                    .help("The version and build running now")
                 Picker("Appearance", selection: $store.appearance) {
                     ForEach(AppAppearance.allCases) { mode in
                         Label(mode.title, systemImage: mode.symbol).tag(mode)
@@ -137,6 +144,14 @@ struct DashboardView: View {
                 .help("Light, dark, or match the Mac")
             }
         }
+    }
+
+    /// The build, not only the release. Several builds carry the same version number
+    /// in a day, and telling them apart is the whole reason this is on screen.
+    private var versionLabel: String {
+        guard let built = AppVersion.builtAt else { return "Brim \(AppVersion.current)" }
+        return "Brim \(AppVersion.current) · "
+            + built.formatted(.dateTime.day().month(.abbreviated).hour().minute())
     }
 
     // MARK: - Detail
