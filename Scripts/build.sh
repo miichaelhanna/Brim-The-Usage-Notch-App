@@ -4,6 +4,12 @@
 #   bash Scripts/build.sh              app only, signed with whatever is available
 #   DMG=1 bash Scripts/build.sh        also produce a .dmg
 #   NOTARIZE=1 DMG=1 bash Scripts/build.sh   sign for release, notarise and staple
+#   INSTALL=0 bash Scripts/build.sh    build without replacing /Applications/Brim.app
+#
+# A finished build replaces the copy in /Applications and reopens it, because the whole
+# point of building is to look at the result. Skipping that is how an afternoon goes into
+# debugging a screenshot of a build from hours earlier: Brim reasserts its login item
+# from whichever copy is running, so a stale one keeps coming back at every restart.
 #
 # Signing degrades on purpose: with a Developer ID certificate it signs for
 # distribution, and without one it signs ad-hoc so a local build still runs. A
@@ -22,6 +28,7 @@ APP="dist/Brim.app"
 # "Brim 1.0.0.dmg" is offered for download as "Brim.1.0.0.dmg".
 DMG_PATH="dist/Brim-$VERSION.dmg"
 NOTARIZE="${NOTARIZE:-0}"
+INSTALL="${INSTALL:-1}"
 DMG="${DMG:-0}"
 # The keychain label the notarytool credential was stored under. It predates the
 # app's rename to Brim; recreating it needs the app-specific password again, so the
@@ -253,6 +260,26 @@ APPLESCRIPT
         spctl -a -t open --context context:primary-signature -vv "$DMG_PATH"
     fi
     echo "    $DMG_PATH"
+fi
+
+if [ "$INSTALL" = "1" ]; then
+    echo "==> Installing into /Applications"
+    # Quit first. Replacing the bundle of a running app is how `ditto` ends up reporting
+    # "Operation not permitted" and leaving the old copy in place, which then looks like
+    # a build that changed nothing.
+    osascript -e 'quit app "Brim"' 2>/dev/null || true
+    for _ in 1 2 3 4 5; do pgrep -f "/Brim.app/Contents/MacOS/Brim" >/dev/null || break; sleep 1; done
+    pkill -f "/Brim.app/Contents/MacOS/Brim" 2>/dev/null || true
+    # Replaced rather than copied over. Ditto merges into an existing bundle, so a file
+    # this build no longer produces would survive in the installed copy.
+    rm -rf /Applications/Brim.app
+    if ditto "$APP" /Applications/Brim.app; then
+        open -a /Applications/Brim.app || true
+        echo "    /Applications/Brim.app is now $VERSION ($BUILD), and reopened"
+    else
+        # Not fatal: the build in dist/ is still good, and this is a convenience.
+        echo "    could not replace /Applications/Brim.app; dist/ is still the new build" >&2
+    fi
 fi
 
 printf '\nBuilt %s (%s): %s\n' "$VERSION" "$BUILD" "$PWD/$APP"
