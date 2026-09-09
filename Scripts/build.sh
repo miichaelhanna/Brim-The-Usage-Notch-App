@@ -179,9 +179,17 @@ if [ "$DMG" = "1" ]; then
     if [ "$LAYOUT" = "1" ]; then
         # Laying the window out means writing a .DS_Store, which only Finder can do, so
         # the image has to be mounted writable first and compressed afterwards.
-        # A volume already called Brim would mount as "Brim 1" and the layout would
-        # be applied to the wrong window, or to nothing.
-        [ -d /Volumes/Brim ] && hdiutil detach /Volumes/Brim -force -quiet || true
+        # A volume already called Brim would mount as "Brim 1", and the layout would
+        # then be applied to the wrong window or to nothing. Every one of them has to
+        # go, not just the unnumbered one: a DMG whose file has since been deleted
+        # leaves its volume attached indefinitely, so the name is already taken by a
+        # mount with no file behind it, and the numbered spelling is the *usual* way
+        # that shows up rather than an edge case. Detaching only /Volumes/Brim left
+        # those in place, and the packaging step then died under `set -e` with nothing
+        # printed, which reads as the build simply stopping.
+        for stale in /Volumes/Brim /Volumes/Brim\ [0-9]*; do
+            [ -d "$stale" ] && hdiutil detach "$stale" -force -quiet 2>/dev/null || true
+        done
         RW="$(mktemp -d)/rw.dmg"
         SIZE=$(( $(du -sm "$STAGE" | cut -f1) + 30 ))
         hdiutil create -quiet -srcfolder "$STAGE" -volname "Brim" -fs HFS+ \
@@ -213,7 +221,7 @@ if [ "$DMG" = "1" ]; then
 APPLESCRIPT
         # Finder writes .DS_Store lazily. Detaching before it lands loses the layout.
         sync
-        hdiutil detach "$MOUNT" -quiet || hdiutil detach "$MOUNT" -force -quiet
+        hdiutil detach "$MOUNT" -quiet || hdiutil detach "$MOUNT" -force -quiet || true
         hdiutil convert "$RW" -quiet -format UDZO -imagekey zlib-level=9 -o "$DMG_PATH"
         rm -rf "$(dirname "$RW")"
     else
