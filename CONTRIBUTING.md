@@ -23,8 +23,8 @@ no credentials, so their output belongs in an issue.
 
 **A provider adapter for a tool you actually use.**
 
-Read automatically today: Claude and Claude Code (one ring), ChatGPT and Codex (one
-ring). Brim lists only what it can read, so a new adapter is also a new row on the
+Read automatically today: Claude chat, Claude Code and Claude Design (one ring),
+ChatGPT and Codex (one ring), Perplexity (counts). Brim lists only what it can read, so a new adapter is also a new row on the
 Connections screen. Wanted: Cursor, Antigravity, Grok, OpenCode, GLM, and whatever
 you use that isn't here.
 

@@ -12,7 +12,8 @@ If anything here is wrong, that's a bug. Please open an issue.
 - **One outbound request type**, to `api.anthropic.com`, for your own Claude usage.
 - **No conversation content is ever read.** Not prompts, not responses, not transcripts.
   Only quota percentages and reset times.
-- **Credentials go in the Keychain**, never a preferences file.
+- **Brim holds no credential of its own.** It reads the ones the tools you already use
+  have saved, and only ever reads them.
 - **Nothing is read until you connect that tool.** Not on launch, not on install.
 
 ## What it reads
@@ -25,6 +26,7 @@ unasked, and all it does is check whether a path exists so the tool can be offer
 |---|---|---|
 | `~/.claude.json` | Claude's usage cache | Only `cachedUsageUtilization`: percentages, reset times, severities, and the account UUID. The rest of the file, which contains project history, is not parsed. |
 | Keychain `Claude Code-credentials*` | Live Claude usage | The access token, **read-only**. Never written, refreshed, or rotated. macOS asks your permission first, and you can refuse. |
+| `~/.claude/.credentials.json` | Live Claude usage | The same access token, **read-only**, for the Macs where Claude Code saved it here rather than in the Keychain. Never written. |
 | `/Applications/ChatGPT.app/.../codex` | Codex and ChatGPT Work usage | Launched as a subprocess and asked for rate limits. Brim never reads or holds an OpenAI credential. Its code signature is verified first. |
 | `~/.local/bin/claude`, or Homebrew's copy | Whether you are signed in to Claude | Launched as a subprocess and asked `auth status`, nothing else. Its code signature is verified first. Brim never reads or copies Claude's credential store. |
 | Any file named by a description in `~/Library/Application Support/Brim/tools/` | Usage for a tool you added yourself | Read as JSON, for the fields you named. Nothing is sent anywhere. |

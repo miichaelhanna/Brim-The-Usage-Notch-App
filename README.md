@@ -51,20 +51,20 @@ Releases are signed with a Developer ID and notarised by Apple, so they open wit
 warnings. If macOS ever says a build is unsigned or from an unidentified developer,
 that build did not come from here, see [SECURITY.md](SECURITY.md).
 
-Requires an Apple Silicon Mac on macOS 14 or later. The released build is arm64 only,
-so it does not run on an Intel Mac.
+Requires macOS 14 or later. Releases are universal, so they run natively on both Apple
+Silicon and Intel Macs.
 
 Prefer to build it yourself? `bash Scripts/build.sh`.
 
 ## What it tracks
 
-One ring per allowance. Claude and Claude Code draw on the same subscription, and
-ChatGPT and Codex on the same Work allowance, so each pair is one ring rather than two
-rings showing the same number.
+One ring per allowance. Claude chat, Claude Code and Claude Design all draw on the same
+subscription, and ChatGPT and Codex on the same Work allowance, so each group is one ring
+rather than several showing the same number.
 
 | Shows | Covers | Where the numbers come from |
 |---|---|---|
-| **Claude** | Claude and Claude Code | Anthropic's usage endpoint, read with the login Claude Code already keeps on this Mac. Until macOS lets it read that login, it falls back to Claude Code's local cache. |
+| **Claude** | Claude chat, Claude Code and Claude Design | Anthropic's usage endpoint, read with the login Claude Code already keeps on this Mac — in the Keychain, or in `~/.claude/.credentials.json` when Claude Code put it there instead. Until macOS lets it read that login, it falls back to Claude Code's local cache. |
 | **ChatGPT** | ChatGPT and Codex | Asks the ChatGPT app's own bundled engine. Brim never handles an OpenAI token. |
 | **Perplexity** | The Perplexity Mac app | The preferences that app already writes. Counts rather than a ring, see below. |
 
@@ -124,7 +124,8 @@ usage you asked for.**
 - The only outbound requests are to `api.anthropic.com` for your Claude usage.
 - Brim never handles your OpenAI credentials at all. It asks the ChatGPT app's
   own engine and reads back the numbers.
-- Your Claude token is stored in the macOS Keychain, not in a preferences file.
+- Brim stores no credential of its own. Live Claude usage is read from the login Claude
+  Code already keeps, and that login is only ever read.
 - It never writes to another app's configuration.
 
 Full detail, file by file: [Docs/privacy.md](Docs/privacy.md).
@@ -159,6 +160,8 @@ Useful flags:
 | Flag | Does |
 |---|---|
 | `--diagnose-claude` | Prints exactly what the app can read for Claude, and why |
+| `--diagnose-tools` | Prints the tools found on this Mac, and any description that failed to load |
+| `--diagnose-screen` | Prints the screen layout and where the notch can sit on it |
 | `--welcome` | Forces the first-run screen |
 | `--page <name>` | Opens a page directly: `usage`, `connections`, `notch` |
 | `--show` | Opens the dashboard at launch |
@@ -174,9 +177,9 @@ more than most patches: `--diagnose-claude`, `--diagnose-tools` and
 `--diagnose-screen` each print what the app can actually see, and none of them expose a
 credential, so the output is safe to paste into an issue.
 
-**What it reads today:** Claude and Claude Code automatically, ChatGPT and Codex
-automatically, and anything else you describe, see
-[Add a tool](Docs/add-a-tool.md).
+**What it reads today:** Claude chat, Claude Code and Claude Design as one allowance,
+ChatGPT and Codex as one, Perplexity's remaining counts, and anything else you describe,
+see [Add a tool](Docs/add-a-tool.md).
 
 **Nothing about the design is specific to those.** Any tool that meters what you use,
 a session limit, a weekly quota, a credit balance, fits the same shape: a percentage,

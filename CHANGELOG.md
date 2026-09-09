@@ -2,6 +2,13 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## 1.4.1 (2026-09-09)
+
+- **The first-run footer said `^[3 tool](inflect: true) connected.`** That is automatic
+  grammar agreement markup, and it is only resolved for a localised key; this was a plain
+  string rendered literally, so the first sentence anyone read of Brim was its own source.
+  It now counts the tools out in words, where nothing can quietly stop resolving it.
+
 ## 1.4.0 (2026-09-09)
 
 Claude connects on Macs where it previously could not, and says what happened on the
