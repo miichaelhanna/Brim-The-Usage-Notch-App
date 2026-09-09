@@ -82,7 +82,11 @@ struct OnboardingView: View {
         if states.contains(where: { $0.status == .checking }) { return "Checking what’s signed in on this Mac…" }
         let ready = states.filter(\.isConnected).count
         guard ready < found.count else {
-            return "^[\(ready) tool](inflect: true) connected. Everything is changeable later."
+            // Spelled out rather than left to `^[...](inflect: true)`. That markup is
+            // only resolved for a localised key, and this is a plain String rendered
+            // by `Text(_: String)`, which treats it as literal — so the first thing
+            // anyone saw on first run was the markup itself.
+            return "\(ready) tool\(ready == 1 ? "" : "s") connected. Everything is changeable later."
         }
         return "\(ready) of \(found.count) connected. The rest can be finished here or in Connections."
     }

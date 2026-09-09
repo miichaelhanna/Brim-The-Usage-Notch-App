@@ -477,7 +477,11 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    private func pollAccounts(force: Bool) {
+    /// Asks each connected account where it stands. `force` skips the refresh policy,
+    /// which the screenshot renderer needs: it runs as a second process against the same
+    /// saved state, so the backoff sees an attempt the real app made seconds ago and
+    /// declines, and every row stays on "Checking…" however long the renderer waits.
+    func pollAccounts(force: Bool) {
         // Sign-out has to surface even when usage polling is backed off or disabled.
         if isConnected(.claudeCode),
            force || refreshPolicy.shouldAttempt(refreshState(.claudeCode), lastActivity: lastActivity, now: now) {

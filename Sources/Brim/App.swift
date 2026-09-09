@@ -361,20 +361,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     /// placeholder where every switch should be, which makes the render useless for
     /// judging the screen. A real view in a real window draws real controls.
     private func renderWelcome(into path: String) {
+        // Screenshots are documentation, so they have to come out the same whoever runs
+        // this and whatever their Mac is set to. Light, always: the rest of the images
+        // in Docs/Screenshots are light, and a set that switches appearance halfway
+        // down the README reads as two different apps.
+        NSApp.appearance = NSAppearance(named: .aqua)
+        // The render path returns before the normal launch finishes, so the process
+        // never got an activation policy. Without one the sign-in subprocesses never
+        // report back and every row stays on "Checking…" however long this waits.
+        NSApp.setActivationPolicy(.accessory)
+        // And started, so the rows have resolved. Rendering the view on its own catches
+        // every tool mid-check, which puts three spinners and "Checking…" in the one
+        // image that is meant to show what Brim found.
+        store.start()
+        // Past the backoff. `start` alone leaves the rows mid-check forever here.
+        store.pollAccounts(force: true)
         let view = NSHostingView(rootView: OnboardingView(store: store) {}.flattened)
         // Sized explicitly. A hosting view's `fittingSize` is no use here: measured off
         // the frame it answers at its own ideal width and clips, and measured off a
         // width constraint it runs away to tens of thousands of points. The screen is
         // a fixed-size illustration either way, so the size is simply stated.
-        let size = NSSize(width: 880, height: 1000)
+        // Tall enough for the whole screen. The onboarding has grown a third tool row,
+        // the note on what switching one on does, and the approval preview, and a canvas
+        // shorter than its contents does not scroll, it crops — off the top, which is
+        // where the app mark is, so the mark lost the white notch that makes it a mark
+        // at all and the screenshot showed a black tile.
+        let size = NSSize(width: 880, height: 1180)
         view.frame = NSRect(origin: .zero, size: size)
         let window = NSWindow(contentRect: NSRect(origin: .zero, size: size), styleMask: [.borderless],
                               backing: .buffered, defer: false)
         window.contentView = view
         view.layoutSubtreeIfNeeded()
-        // One turn of the run loop, so the hosting view has actually drawn before it
-        // is asked for its bitmap.
-        DispatchQueue.main.async {
+        // Long enough for the sign-in checks and the first readings to land. One turn of
+        // the run loop only guarantees the view has drawn, which it does before any of
+        // them have answered.
+        // The sign-in checks are subprocesses with a ten second timeout of their own,
+        // and the Codex poll stands aside while Claude's is in flight, so anything
+        // shorter photographs the screen mid-check: three toggles on and two rows still
+        // saying "Checking…", which is the one thing this image must not show.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 8.0) {
+            view.layoutSubtreeIfNeeded()
             guard let rep = view.bitmapImageRepForCachingDisplay(in: view.bounds) else { exit(1) }
             view.cacheDisplay(in: view.bounds, to: rep)
             guard let data = rep.representation(using: .png, properties: [:]) else { exit(1) }
