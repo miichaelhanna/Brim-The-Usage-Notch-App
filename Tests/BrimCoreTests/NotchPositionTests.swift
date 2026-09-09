@@ -96,6 +96,40 @@ final class NotchPositionTests: XCTestCase {
         XCTAssertLessThanOrEqual(side.maxY, screen.maxY - 38 - 8)
     }
 
+    /// The housing is not screen. A ring drawn under it is not dim, it is absent, so
+    /// the top edge of a notched Mac buys its window an extra strip the depth of the
+    /// housing and draws nothing legible in it. Without that, the folded notch was
+    /// exactly the housing and so entirely invisible, and the open one lost its rings
+    /// behind the camera with only the bottom of the grip showing underneath.
+    func testNotchedTopEdgeKeepsItsContentsBelowTheCameraHousing() throws {
+        let housing = try XCTUnwrap(DisplayCutout(width: 200, depth: 38))
+        let notched = NotchScreenLayout(screenFrame: screen, visibleFrame: screen, reservedTop: 38,
+                                        dockPosition: .bottom, cutout: housing)
+        XCTAssertEqual(notched.contentInset(for: .top), housing.depth)
+        // Every other edge, and every display without a housing, is untouched.
+        for anchor in [NotchAnchor.right, .left, .bottom] {
+            XCTAssertEqual(notched.contentInset(for: anchor), 0)
+            XCTAssertEqual(notched.windowSize(content: horizontal, anchor: anchor), horizontal)
+        }
+        XCTAssertEqual(layout(.bottom).contentInset(for: .top), 0)
+        XCTAssertEqual(layout(.bottom).windowSize(content: horizontal, anchor: .top), horizontal)
+
+        let window = notched.windowSize(content: horizontal, anchor: .top)
+        XCTAssertEqual(window, CGSize(width: horizontal.width, height: horizontal.height + housing.depth))
+        let frame = try XCTUnwrap(notched.notchFrame(size: window, anchor: .top))
+        XCTAssertEqual(frame.maxY, screen.maxY, "still flush with the hardware it merges into")
+        XCTAssertEqual(frame.maxY - housing.depth - horizontal.height, frame.minY,
+                       "and the contents clear the housing entirely")
+
+        // The folded handle keeps its own thickness on top of that, so a strip of it
+        // shows below the housing instead of hiding inside it.
+        let handle = notched.windowSize(content: CGSize(width: housing.width, height: 12), anchor: .top)
+        XCTAssertEqual(handle, CGSize(width: housing.width, height: 50))
+        let folded = try XCTUnwrap(notched.notchFrame(size: handle, anchor: .top, expandedSize: window))
+        XCTAssertEqual(folded.maxY, screen.maxY)
+        XCTAssertEqual(folded.maxY - folded.minY - housing.depth, 12, "12pt of it is on screen")
+    }
+
     func testDisplayCutoutRejectsImpossibleDimensions() {
         XCTAssertNil(DisplayCutout(width: 0, depth: 38))
         XCTAssertNil(DisplayCutout(width: 200, depth: 0))

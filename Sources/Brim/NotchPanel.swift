@@ -357,6 +357,10 @@ struct NotchShellView: View {
     /// rather than measured here: the panel already knows it, and a shell that
     /// disagreed with the frame it is inside would slide as the window resized.
     let expandedSize: CGSize
+    /// How much of the window, measured from the anchored edge, is behind a camera
+    /// housing. The silhouette still fills it, because that is what merges it with the
+    /// hardware, but nothing legible is drawn there.
+    var edgeInset: CGFloat = 0
     let content: NotchView
     var expand: () -> Void = {}
     private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
@@ -375,6 +379,8 @@ struct NotchShellView: View {
                            height: placement.isHorizontal ? pill.height : pill.width)
                     .opacity(expanded ? 0 : 1)
                     .animation(reduceMotion ? nil : pillFade, value: expanded)
+                    // Centred in the strip the housing leaves, not in the window.
+                    .padding(.top, edgeInset)
             }
             .overlay(alignment: contentAlignment) {
                 content.frame(width: expandedSize.width, height: expandedSize.height)
@@ -382,6 +388,7 @@ struct NotchShellView: View {
                     // that does not would otherwise take the hover meant for the
                     // handle underneath it.
                     .allowsHitTesting(expanded)
+                    .padding(.top, edgeInset)
             }
             .overlay { if !expanded { expandTarget } }
             .foregroundStyle(.white).preferredColorScheme(.dark)
@@ -728,8 +735,19 @@ final class NotchController {
         revealState.isExpanded ? expandedSize(for: anchor) : collapsedSize(for: anchor)
     }
 
-    private func expandedSize(for anchor: NotchAnchor) -> CGSize {
+    /// The contents at full size, before the edge takes its share.
+    private func contentSize(for anchor: NotchAnchor) -> CGSize {
         anchor.isHorizontal ? horizontalSize : sideSize
+    }
+
+    /// The window those contents need, which on a notched Mac's top edge is taller
+    /// than they are by the depth of the camera housing.
+    private func expandedSize(for anchor: NotchAnchor) -> CGSize {
+        windowSize(for: contentSize(for: anchor), anchor: anchor)
+    }
+
+    private func windowSize(for content: CGSize, anchor: NotchAnchor) -> CGSize {
+        currentLayout?.windowSize(content: content, anchor: anchor) ?? content
     }
 
     /// Hands the new state to the contents. Called instead of rebuilding them: the
@@ -747,7 +765,9 @@ final class NotchController {
         guard let panel, let anchor else { return }
         let host = NSHostingView(rootView: NotchShellView(
             reveal: reveal, placement: anchor, metrics: metrics,
-            expandedSize: expandedSize(for: anchor), content: fullView(at: anchor),
+            expandedSize: contentSize(for: anchor),
+            edgeInset: currentLayout?.contentInset(for: anchor) ?? 0,
+            content: fullView(at: anchor),
             expand: { [weak self] in self?.expand() }))
         reveal.isExpanded = revealState.isExpanded
         presentedSize = targetSize(for: anchor)
@@ -771,11 +791,15 @@ final class NotchController {
         revealState.isExpanded ? (0.3, NotchEase.opening) : (0.22, NotchEase.folding)
     }
 
+    /// Matched to the camera housing across the top, so the two read as one shape, and
+    /// deeper than it by a handle's thickness, so there is something left to see and
+    /// something to hover. Sized to the housing exactly, as it was, the folded notch
+    /// was drawn entirely inside a piece of display that does not exist, and the app
+    /// vanished on the edge it was named after until you happened to hover the camera.
     private func collapsedSize(for anchor: NotchAnchor) -> CGSize {
-        if anchor == .top, let cutout = currentLayout?.cutout {
-            return CGSize(width: cutout.width, height: cutout.depth)
-        }
-        return metrics.collapsedSize(anchor)
+        guard anchor == .top, let cutout = currentLayout?.cutout else { return metrics.collapsedSize(anchor) }
+        return windowSize(for: CGSize(width: cutout.width, height: metrics.collapsedSize(.top).height),
+                          anchor: .top)
     }
 
     /// The top edge has to reach the menu-bar layer to meet the hardware notch. Every

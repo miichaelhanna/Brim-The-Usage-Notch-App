@@ -169,6 +169,30 @@ public struct NotchScreenLayout: Equatable, Sendable {
         return NotchPosition(anchor: position.anchor, fraction: fraction)
     }
 
+    /// How far a notch's contents must be held back from the edge it hangs on before
+    /// anything drawn in them can be seen.
+    ///
+    /// Only the top edge of a display with a camera housing has one. The window still
+    /// reaches the physical top of the screen, because that is what makes it read as
+    /// part of the hardware rather than as a pill floating under the menu bar. But the
+    /// housing is not a dim or clipped piece of screen, it is not screen at all, so a
+    /// ring drawn under it is simply not there. The rings, the numbers, the grip and
+    /// the folded handle's pill all start below it.
+    public func contentInset(for anchor: NotchAnchor) -> CGFloat {
+        guard anchor == .top, let cutout else { return 0 }
+        return cutout.depth
+    }
+
+    /// The window a notch needs in order to show `content` on `anchor`: the contents'
+    /// own size, plus whatever that edge hides. Kept here rather than at each call
+    /// site, so the folded handle and the open notch cannot disagree about how much
+    /// of the top of the window is unusable.
+    public func windowSize(content: CGSize, anchor: NotchAnchor) -> CGSize {
+        let inset = contentInset(for: anchor)
+        guard inset > 0, content.height.isFinite else { return content }
+        return CGSize(width: content.width, height: content.height + inset)
+    }
+
     public func detailFrame(size: CGSize, notchFrame: CGRect, anchor: NotchAnchor, itemCenterFromTop: CGFloat) -> CGRect? {
         let origin: CGPoint
         switch anchor {

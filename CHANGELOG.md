@@ -4,11 +4,21 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 
 ## 1.3.0 (2026-09-09)
 
-The notch moves the way it always looked like it should, and the window says which
-build of it you are running.
+The notch moves the way it always looked like it should, it stops hiding inside the
+camera housing on a MacBook that has one, and the window says which build of it you
+are running.
 
 ### The notch
 
+- **The top edge no longer disappears into a MacBook's camera housing.** The housing is
+  not a dim or clipped piece of screen, it is not screen at all, so everything drawn
+  under it was simply absent: folded, the notch was sized to the housing exactly and so
+  could not be seen or found at all, and open, the camera swallowed the rings and the
+  top of the grip and left a sliver of them showing underneath. The window still reaches
+  the physical top of the screen, because that is what merges it with the hardware, but
+  it is now deeper than the housing by as much as it needs, and the rings, the numbers,
+  the grip and the folded handle's pill all sit below it. Every other edge, and every
+  display without a housing, is exactly as it was.
 - **Opening is one motion rather than three.** The notch used to swap its whole contents
   the instant it opened and then resize around them, so the expanded layout spent the
   entire animation being squeezed into a window far too small for it and sprang out at
