@@ -36,7 +36,8 @@ struct ClaudeLiveSetupCard: View {
                 Text("Live Claude updates are on").font(.headline)
                 Spacer()
             }
-            Text("Brim reads the login Claude Code already keeps on this Mac, and only reads it. It "
+            Text("One allowance covers Claude chat, Claude Code and Claude Design, and this is it. "
+                 + "Brim reads the login Claude Code already keeps on this Mac, and only reads it. It "
                  + "cannot expire, rotate or invalidate that login, so it cannot sign you out of Claude Code. "
                  + "Switching this off stops the reading; the permission macOS granted is macOS’s to "
                  + "withdraw, in Keychain Access.")
@@ -55,8 +56,11 @@ struct ClaudeLiveSetupCard: View {
 
     private var offered: some View {
         VStack(alignment: .leading, spacing: 13) {
-            Text("There is nothing to paste and no second login. macOS will ask once whether Brim may "
-                 + "read that saved login. Choose Always Allow and the numbers go live.")
+            Text("This reads the login Claude Code keeps on this Mac, which is the only credential "
+                 + "here that Anthropic will answer usage for. Claude chat and Claude Design draw on the "
+                 + "same allowance, so one login covers all three, but signing in to claude.ai does not "
+                 + "leave one behind: Claude Code has to be installed and signed in once. There is "
+                 + "nothing to paste. macOS will ask once whether Brim may read it — choose Always Allow.")
                 .font(.callout)
                 .fixedSize(horizontal: false, vertical: true)
             HStack(spacing: 12) {

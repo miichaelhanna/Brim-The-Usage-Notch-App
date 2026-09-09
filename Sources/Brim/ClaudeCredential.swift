@@ -48,10 +48,49 @@ enum ClaudeCredential {
     /// stored password's contents at once, by contrast, is refused outright, and
     /// deserves to be.
     ///
-    /// Phase two reads only the few most recently written matching items. Claude Code
-    /// keeps a base entry plus per-install siblings, and prompting once per entry
-    /// would mean a wall of dialogs; the newest is the one it is actually using.
-    static func look(now: Date = Date(), maximumReads: Int = 1) -> Lookup {
+    /// Phase two reads the most recently written matching items, newest first, and
+    /// stops at the first one it actually reads. Claude Code keeps a base entry plus
+    /// per-install siblings, and prompting once per entry would mean a wall of dialogs,
+    /// so the search moves on in exactly one case: a read that macOS refused on its own,
+    /// which showed no dialog and so cost the person nothing. Any read that succeeded
+    /// ends the walk, and so does an explicit cancel, because that is someone saying no.
+    ///
+    /// It reads more than one because reading exactly one used to end the whole search
+    /// on a single silent refusal, with a working sibling directly behind it and
+    /// nothing on screen to say a read had even been attempted.
+    /// Claude Code's login, from wherever this Mac happens to keep it.
+    ///
+    /// The Keychain is the usual place and is tried first. It is not the only one:
+    /// Claude Code falls back to a plain file at `~/.claude/.credentials.json` when it
+    /// cannot use the Keychain, and an install that took that path leaves nothing in
+    /// the Keychain at all. Looking only there reported "no Claude Code login on this
+    /// Mac" to someone signed into Claude Code, and — because there was no secret to
+    /// ask about — macOS never offered the permission dialog either, so the app looked
+    /// broken rather than mistaken.
+    static func look(now: Date = Date(), maximumReads: Int = 4) -> Lookup {
+        let keychain = lookInKeychain(now: now, maximumReads: maximumReads)
+        if case .found = keychain { return keychain }
+        guard let token = fileToken() else { return keychain }
+        if token.isValid(at: now) { return .found(token) }
+        // A stale file is still better evidence than a Keychain that held nothing:
+        // it says a login exists and has lapsed, which is a different thing to fix.
+        if case .missing = keychain, let expiry = token.expiresAt { return .expired(at: expiry) }
+        return keychain
+    }
+
+    /// The file Claude Code writes when it is not using the Keychain. Read-only, and
+    /// only ever this one path.
+    static var credentialsFile: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".claude/.credentials.json")
+    }
+
+    static func fileToken() -> Token? {
+        guard let data = try? Data(contentsOf: credentialsFile) else { return nil }
+        return parse(data)
+    }
+
+    private static func lookInKeychain(now: Date, maximumReads: Int) -> Lookup {
         let discovery: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecMatchLimit as String: kSecMatchLimitAll,
@@ -88,8 +127,18 @@ enum ClaudeCredential {
                 // The newest valid one is enough; stop before prompting again.
                 if token.isValid(at: now) { return .found(token) }
                 tokens.append(token)
+                // A read that succeeded means macOS is showing dialogs and they are
+                // being answered, so every further sibling costs another one. Stop:
+                // the siblings are older installs and older still means more likely
+                // lapsed, and a lapsed newest entry is fixed by Claude Code renewing
+                // it rather than by hunting behind it.
+                break
             } else if read != errSecItemNotFound {
                 refusal = read
+                // Answering a dialog is the one refusal worth honouring immediately.
+                // Every other status was decided without asking, so the next sibling
+                // costs the person nothing.
+                if read == errSecUserCanceled { break }
             }
         }
 
@@ -116,6 +165,30 @@ enum ClaudeCredential {
             .filter { ($0[kSecAttrService as String] as? String)?.hasPrefix(servicePrefix) ?? false }
             .compactMap { $0[kSecAttrModificationDate as String] as? Date }
             .max()
+    }
+
+    /// What a refusal actually was, in words.
+    ///
+    /// These do not describe one situation. A remembered Deny and a keychain macOS
+    /// will not open a dialog for both end in no prompt and no usage, and the person
+    /// in front of them can only act on one of them, so the app has to tell them apart.
+    static func explain(_ status: OSStatus) -> String {
+        switch status {
+        case errSecUserCanceled, errSecAuthFailed:
+            return "the permission was declined once and macOS remembers that answer, so it no "
+                + "longer asks. Open Keychain Access, find “Claude Code-credentials”, and allow Brim "
+                + "on its Access Control tab."
+        case errSecInteractionNotAllowed:
+            return "macOS would not open the permission dialog. That usually means the login "
+                + "keychain is locked; unlocking it in Keychain Access and trying again is the fix."
+        case errSecMissingEntitlement:
+            return "macOS placed that login somewhere only Claude Code itself can reach, so no "
+                + "permission dialog can be offered for it."
+        case errSecItemNotFound:
+            return "the login was gone by the time it was read."
+        default:
+            return "macOS refused the read and gave no reason beyond code \(status)."
+        }
     }
 
     static func parse(_ data: Data) -> Token? {

@@ -46,11 +46,22 @@ echo "==> Testing"
 swift test
 
 echo "==> Building $VERSION ($BUILD)"
-swift build -c release
+# Universal, so the app runs on Intel Macs too. A thin arm64 build does not degrade on
+# an Intel Mac, it refuses to launch at all, and says nothing a person can act on.
+# Cross-compiling needs an SDK that is not always present, so this degrades the way
+# signing does: a native build still runs here, and the release path checks the result
+# rather than trusting it.
+BINARY=".build/apple/Products/Release/Brim"
+if ! swift build -c release --arch arm64 --arch x86_64 || [ ! -f "$BINARY" ]; then
+    echo "    universal build unavailable; building for this Mac only" >&2
+    swift build -c release
+    BINARY=".build/release/Brim"
+fi
+echo "    architectures: $(lipo -archs "$BINARY")"
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-cp .build/release/Brim "$APP/Contents/MacOS/Brim"
+cp "$BINARY" "$APP/Contents/MacOS/Brim"
 sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" Resources/Info.plist > "$APP/Contents/Info.plist"
 
 echo "==> Icon"
@@ -124,6 +135,12 @@ notarise() {
 if [ "$NOTARIZE" = "1" ]; then
     if [ -z "$IDENTITY" ]; then
         echo "Cannot notarise an ad-hoc signed app. A Developer ID certificate is required." >&2
+        exit 1
+    fi
+    # Releasing a thin binary means offering a download that cannot open on half the
+    # Macs it is offered to, which is a worse failure than not shipping.
+    if ! lipo -archs "$APP/Contents/MacOS/Brim" | grep -q x86_64; then
+        echo "Refusing to release a build without x86_64: it cannot launch on an Intel Mac." >&2
         exit 1
     fi
     ZIP="dist/notarize-$VERSION.zip"

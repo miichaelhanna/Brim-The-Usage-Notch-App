@@ -169,4 +169,39 @@ final class UsageParserTests: XCTestCase {
         XCTAssertTrue(try UsageParser.claude(Data(#"{"limits":[]}"#.utf8), now: now).windows.isEmpty)
         XCTAssertThrowsError(try UsageParser.claude(Data("not json".utf8), now: now))
     }
+
+    /// One allowance covers Claude chat, Claude Code and Claude Design, and Anthropic
+    /// does not break it out: `scope.surface` is null on every account seen. When it
+    /// stops being null the surface has to reach the window's name by itself, because
+    /// that is the only way a per-surface figure will ever appear without a new build.
+    func testSurfaceScopedLimitIsNamedAfterItsSurface() throws {
+        let payload = Data(#"""
+        {"limits":[
+          {"kind":"weekly_scoped","group":"weekly","percent":31,
+           "scope":{"model":null,"surface":{"display_name":"Claude Design"}}},
+          {"kind":"weekly_scoped","group":"weekly","percent":62,
+           "scope":{"model":{"display_name":"Fable"},"surface":"Claude Code"}}]}
+        """#.utf8)
+        let windows = try UsageParser.claude(payload, now: now).windows
+        XCTAssertEqual(windows.map(\.title), ["Claude Design · weekly", "Fable · Claude Code · weekly"])
+        XCTAssertEqual(windows.map(\.scopeLabel), ["Claude Design", "Fable · Claude Code"])
+        // Two surface-scoped limits of the same kind are two windows, not one
+        // overwriting the other, so the surface has to reach the id as well.
+        XCTAssertEqual(Set(windows.map(\.id)).count, 2)
+    }
+
+    /// The per-surface siblings are null on every account seen so far. Read when they
+    /// are present, ignored when they are not, and never invented as zero.
+    func testPerSurfaceSiblingsAreReadWhenPresentAndSkippedWhenNull() throws {
+        let payload = Data(#"""
+        {"limits":[{"kind":"session","group":"session","percent":10}],
+         "seven_day_cowork":{"utilization":45},"seven_day_opus":null,
+         "nimbus_quill":{"utilization":0}}
+        """#.utf8)
+        let windows = try UsageParser.claude(payload, now: now).windows
+        // The session limit, plus Cowork. `seven_day_opus` is null, and `nimbus_quill`
+        // is an unlabelled internal bucket that must never become a ring.
+        XCTAssertEqual(windows.map(\.title), ["Current session", "Cowork · weekly"])
+        XCTAssertEqual(windows.map(\.usedPercent), [10, 45])
+    }
 }

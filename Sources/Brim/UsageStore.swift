@@ -109,12 +109,13 @@ final class UsageStore: ObservableObject {
     var executable: String? { customCodexPath.isEmpty ? CodexConnection.findExecutable() : customCodexPath }
     var claudeSourceMessage: String {
         if let error = errors[.claudeCode] { return error }
-        guard signedInProviders.contains(.claudeCode) else {
+        // A live failure explains itself, including the case where there is no Claude
+        // Code login on this Mac at all. It has to be asked before the sign-in badge,
+        // which is only ever evidence and never the reason.
+        if let liveUnavailable { return liveUnavailable.message }
+        guard signedInProviders.contains(.claudeCode) || liveClaude == .on else {
             return "Sign in with Claude Code to show your Claude allowance here."
         }
-        // A live failure is worth explaining even while a cached reading is on screen,
-        // because it explains why the number is not moving.
-        if let liveUnavailable { return liveUnavailable.message }
         guard let snapshot = snapshot(.claudeCode) else {
             return "Waiting for the first reading."
         }
@@ -205,8 +206,13 @@ final class UsageStore: ObservableObject {
             guard let self else { return }
             // The cached reading stays on screen; only the explanation changes.
             self.liveUnavailable = reason
-            // Not yet asked for is a starting point, not a fault worth colouring orange.
-            self.liveClaude = reason == .noCredential ? .off : .problem(reason.message)
+            // Every one of these arrives after someone pressed Connect, so none of them
+            // is "not asked for yet". Mapping a missing credential back to `.off` put the
+            // card back to the button that had just been pressed, with nothing said: on a
+            // Mac with only Claude chat, where there is no Claude Code login to find,
+            // pressing it was silent and no macOS prompt appeared either, because there
+            // was no secret to ask permission for.
+            self.liveClaude = .problem(reason.message)
             self.recordOutcome(.claudeCode, succeeded: false)
             self.endRefreshing(AccountSignIn.claudeProviders.map(\.rawValue))
         }
@@ -681,7 +687,8 @@ final class UsageStore: ObservableObject {
 
 /// Whether Anthropic is answering with live usage.
 enum LiveClaudeState: Equatable {
-    /// Not asked for yet, or there is no Claude Code login to read.
+    /// Not asked for yet. Only disconnecting returns the state here; a live read that
+    /// finds nothing is a `problem` with something to say, not a silent reset.
     case off
     case checking
     case on

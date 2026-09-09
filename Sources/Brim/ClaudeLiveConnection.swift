@@ -25,7 +25,7 @@ final class ClaudeLiveConnection {
     enum Unavailable: Equatable, Error {
         case noCredential
         case credentialExpired
-        case accessDenied
+        case accessDenied(OSStatus)
         case rejected
         case network(String)
         case unreadable
@@ -33,8 +33,11 @@ final class ClaudeLiveConnection {
         var message: String {
             switch self {
             case .noCredential:
-                "No Claude Code login was found on this Mac. Sign in with Claude Code and live "
-                    + "usage turns on by itself."
+                "No Claude Code login was found on this Mac. One allowance covers Claude chat, "
+                    + "Claude Code and Claude Design, but the only credential on a Mac that can read "
+                    + "it belongs to Claude Code, the command line tool — the Claude app and claude.ai "
+                    + "leave none behind. Install Claude Code and sign in once and these numbers turn "
+                    + "on by themselves, including your chat usage. You never have to use it."
             case .credentialExpired:
                 "Claude Code’s saved login has lapsed. Only Claude Code can renew it, and running "
                     + "the `claude` command once does: Brim sees the new login and goes live again "
@@ -42,9 +45,9 @@ final class ClaudeLiveConnection {
             case .rejected:
                 "Anthropic rejected Claude Code’s saved login. Signing in again with Claude Code "
                     + "replaces it."
-            case .accessDenied:
+            case .accessDenied(let status):
                 "Brim wasn’t allowed to read Claude Code’s saved login, so it can’t fetch live "
-                    + "usage. Turn it on again and choose Always Allow, or allow Brim in Keychain Access."
+                    + "usage: \(ClaudeCredential.explain(status))"
             case .network(let detail):
                 "Couldn’t reach Anthropic for live usage: \(detail)"
             case .unreadable:
@@ -92,7 +95,7 @@ final class ClaudeLiveConnection {
         isLookingUp = false
         switch lookup {
         case .missing: deliver(.noCredential)
-        case .denied(_): deliver(.accessDenied)
+        case .denied(let status): deliver(.accessDenied(status))
         case .expired: cached = nil; deliver(.credentialExpired)
         case .found(let token):
             cached = token

@@ -45,11 +45,19 @@ enum ClaudeUsageDiagnostic {
     private static func checkLive() {
         print("")
         print("Live source: api.anthropic.com/api/oauth/usage")
+        // Which of the two places Claude Code might keep its login actually holds one.
+        // A machine with neither, and a machine whose login is in the file rather than
+        // the Keychain, produce the same silence otherwise.
+        let file = ClaudeCredential.credentialsFile
+        print("Credentials file \(file.path): "
+              + (FileManager.default.fileExists(atPath: file.path)
+                 ? (ClaudeCredential.fileToken() == nil ? "present, unreadable" : "present, readable") : "absent"))
         switch ClaudeCredential.look() {
         case .missing:
-            print("No Claude Code login found in the Keychain.")
+            print("No Claude Code login found, in the Keychain or the credentials file.")
         case .denied(let status):
             print("Keychain access was refused (OSStatus \(status)), so live usage is unavailable.")
+            print("Meaning: \(ClaudeCredential.explain(status))")
             print("A dev build has no stable code identity; a signed build is granted access once.")
         case .expired(let when):
             print("Saved login expired \(when.formatted(.iso8601)). Claude Code renews it on next use.")

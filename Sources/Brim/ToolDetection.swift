@@ -40,8 +40,14 @@ enum KnownTool: String, CaseIterable, Identifiable {
         let home = Self.home.path
         switch self {
         case .claudeCode:
+            // Claude Code, and only Claude Code. `/Applications/Claude.app` is the
+            // Claude desktop app, which is a different product: it stores a different
+            // Keychain item, and that item cannot read usage. Counting it here offered
+            // a Claude Code row to people who had never installed Claude Code, whose
+            // Connect button could only ever do nothing, silently.
             return ["\(home)/.claude.json", "\(home)/.claude", "\(home)/.local/bin/claude",
-                    "/Applications/Claude.app"]
+                    "\(home)/.bun/bin/claude", "\(home)/.volta/bin/claude",
+                    "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
         case .codex:
             return ["\(home)/.codex/auth.json", "\(home)/.codex",
                     "/Applications/ChatGPT.app", "/Applications/Codex.app"]
@@ -103,7 +109,7 @@ extension KnownTool {
         case .claudeCode:
             if let error = store.errors[.claudeCode] { return ToolConnection(status: .problem, detail: error) }
             if store.liveClaude == .on {
-                return ToolConnection(status: .connected, detail: "Live · one allowance for Claude and Claude Code")
+                return ToolConnection(status: .connected, detail: "Live · one allowance for Claude chat, Claude Code and Claude Design")
             }
             if store.liveClaude == .checking || !store.checkedProviders.contains(.claudeCode) {
                 return ToolConnection(status: .checking, detail: "Checking the Claude Code sign-in on this Mac…")
@@ -121,7 +127,9 @@ extension KnownTool {
                                       detail: "Signed in, showing Claude Code’s cached reading. "
                                       + "Allow the live read for current numbers.")
             }
-            return ToolConnection(status: .needsSignIn, detail: "Sign in with Claude Code to read your allowance.")
+            return ToolConnection(status: .needsSignIn,
+                                  detail: "Sign in with Claude Code to read your allowance. It is what "
+                                  + "holds the login Brim reads; the Claude app alone leaves none.")
         case .codex:
             if let error = store.errors[.codex] { return ToolConnection(status: .problem, detail: error) }
             if store.signedInProviders.contains(.codex) {
@@ -150,8 +158,8 @@ extension KnownTool {
     private var offer: String {
         switch self {
         case .claudeCode:
-            "Not connected. Connect to read your Claude allowance from the login Claude Code "
-                + "already keeps on this Mac."
+            "Not connected. Connect to read your Claude allowance — chat, Code and Design share "
+                + "one — from the login Claude Code already keeps on this Mac."
         case .codex:
             "Not connected. Connect to read the Work allowance ChatGPT and Codex share, through "
                 + "the ChatGPT app’s own sign-in. No API key needed."

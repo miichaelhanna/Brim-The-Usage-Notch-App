@@ -35,7 +35,7 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
     /// What this figure covers, and what it does not.
     public var usageScopeNote: String? {
         switch displayProvider {
-        case .claude: "Claude and Claude Code draw on this one allowance."
+        case .claude: "Claude chat, Claude Code and Claude Design all draw on this one allowance. Anthropic meters them together and does not break them out."
         case .chatgpt: "ChatGPT and Codex draw on this one Work allowance. Regular Chat and Voice limits are not included."
         // The one place this is said in full. Perplexity publishes what is left and
         // never the allowance, so there is no percentage to be had and the app shows
@@ -46,7 +46,7 @@ public enum Provider: String, CaseIterable, Codable, Identifiable, Sendable {
     }
     public var subtitle: String {
         switch self {
-        case .claude: "Claude and Claude Code"
+        case .claude: "Chat, Code and Design"
         case .chatgpt: "ChatGPT and Codex"
         case .codex: "Build without surprises"
         case .claudeCode: "Keep your flow going"
