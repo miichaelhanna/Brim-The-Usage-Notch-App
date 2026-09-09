@@ -106,6 +106,18 @@ for attempt in 1 2 3; do
     xattr -cr "$APP"
 done
 
+# Every slice, not just this Mac's. `codesign --verify` on its own checks the
+# architecture the machine runs, so a universal build can pass here and still be
+# refused by Apple, which checks them all — and it reports that as "the signature of
+# the binary is invalid" after a full notarisation round trip rather than in a second
+# here. One release attempt was lost to exactly that.
+for arch in $(lipo -archs "$APP/Contents/MacOS/Brim"); do
+    if ! codesign --verify --strict --arch "$arch" "$APP"; then
+        echo "The $arch slice is not correctly signed. Notarisation would reject this." >&2
+        exit 1
+    fi
+done
+
 # Submits one file and waits for Apple's verdict. Anything but Accepted is a failure,
 # reported with Apple's own log so the reason is in the terminal rather than a portal.
 notarise() {
