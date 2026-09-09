@@ -422,70 +422,27 @@ struct NotchShellView: View {
     }
 }
 
-/// The hover card, wrapped in the motion that brings it out of the notch.
+/// The hover card.
 ///
-/// The card used to be ordered in and out of existence: it appeared whole, at full
-/// size, a fixed gap away from a ring, with nothing tying it to the notch it had come
-/// from. It now grows out of the edge the notch is attached to — scaled from the side
-/// facing it, and starting a little way inside it — so the notch reads as the thing
-/// that produced it.
+/// It is simply there, at full size, where it is. An earlier version grew it out of the
+/// edge the notch is attached to — scaled from the side facing it, starting a little way
+/// inside — so that the notch read as the thing that had produced it. That is gone.
 ///
-/// The shadow moved in here with it. A window shadow is derived from the window's
-/// shape and is not recomputed as its contents are redrawn, so an AppKit one stayed
-/// the size of the finished card while the card was still growing into it.
+/// The shadow stays here rather than on the window, which is not about motion: a window
+/// shadow is derived from the window's shape and is not recomputed as its contents are
+/// redrawn, and these contents do change size, because the card reflows when it travels
+/// from one ring to another.
 struct HoverCardView: View {
     /// Room left around the card for the shadow to fall into. The window is that much
     /// larger than the card on every side, and the card is centred in it.
     static let shadowMargin: CGFloat = 36
 
-    @ObservedObject var reveal: NotchRevealModel
-    let placement: NotchAnchor
     let content: HoverDetailView
-    private var reduceMotion: Bool { NSWorkspace.shared.accessibilityDisplayShouldReduceMotion }
 
     var body: some View {
-        let shown = reveal.isExpanded
         content
-            // Before the transforms, so the shadow grows with the card rather than
-            // sitting under it at full size from the first frame.
             .shadow(color: .black.opacity(0.55), radius: 22, y: 10)
-            .scaleEffect(shown ? 1 : 0.9, anchor: notchSide)
-            .offset(x: shown ? 0 : tucked.width, y: shown ? 0 : tucked.height)
-            .opacity(shown ? 1 : 0)
-            // After them: `padding` is layout and the transforms are not, so this sets
-            // the window's size while leaving the scale anchored on the card's own
-            // edge rather than on the margin around it.
             .padding(Self.shadowMargin)
-            .animation(animation, value: shown)
-    }
-
-    /// The side of the card facing the notch. Everything scales away towards it.
-    private var notchSide: UnitPoint {
-        switch placement {
-        case .right: .trailing
-        case .left: .leading
-        case .top: .top
-        case .bottom: .bottom
-        }
-    }
-
-    /// Where the card starts from: a little way back inside the notch.
-    private var tucked: CGSize {
-        let depth: CGFloat = 14
-        switch placement {
-        case .right: return CGSize(width: depth, height: 0)
-        case .left: return CGSize(width: -depth, height: 0)
-        case .top: return CGSize(width: 0, height: -depth)
-        case .bottom: return CGSize(width: 0, height: depth)
-        }
-    }
-
-    /// Out on a spring, back on a plain curve and faster. Going away is not worth
-    /// watching, and the pointer has usually already left for something else.
-    private var animation: Animation? {
-        guard !reduceMotion else { return nil }
-        return reveal.isExpanded ? .spring(response: 0.32, dampingFraction: 0.82)
-                                 : .easeIn(duration: 0.12)
     }
 }
 
@@ -632,7 +589,7 @@ final class NotchController {
     /// The card's own reveal flag and animator. Separate from the notch's: the card
     /// can be arriving while the notch is still opening, and one of each would have
     /// them stepping on one another.
-    private let cardReveal = NotchRevealModel(isExpanded: false)
+    private var cardShowing = false
     private let cardAnimator = NotchFrameAnimator()
     /// The card without the margin the shadow falls into. The window is larger than
     /// what anyone can see, and the pointer test has to use what they can see.
@@ -640,7 +597,6 @@ final class NotchController {
     private var hideWork: DispatchWorkItem?
     /// Ordering the window away once the card has finished retracting. Separate from
     /// `hideWork`, which is the wait *before* it starts.
-    private var dismissWork: DispatchWorkItem?
     private var screenObserver: NSObjectProtocol?
     private var layoutTimer: Timer?
     private var hoverTimer: Timer?
@@ -694,8 +650,8 @@ final class NotchController {
         clearSlide()
         frameAnimator.stop()
         hoverTimer?.invalidate(); hoverTimer = nil
-        hideWork?.cancel(); dismissWork?.cancel(); cardAnimator.stop()
-        cardReveal.isExpanded = false; cardFrame = nil
+        hideWork?.cancel(); cardAnimator.stop()
+        cardShowing = false; cardFrame = nil
         panel?.close(); detail?.close(); detail = nil; panel = nil
         anchor = nil
         lastLayout = nil
@@ -926,13 +882,13 @@ final class NotchController {
         NotchPositionControl.cancelActiveDrag()
         frameAnimator.stop(); cardAnimator.stop()
         layoutTimer?.invalidate(); hoverTimer?.invalidate()
-        hideWork?.cancel(); dismissWork?.cancel()
+        hideWork?.cancel()
         if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
         panel?.close(); detail?.close()
     }
 
     private func showDetail(_ tool: TrackedTool) {
-        hideWork?.cancel(); dismissWork?.cancel()
+        hideWork?.cancel()
         store.refreshForDisplay()
         updateLayout()
         guard !isSliding, isVisible, revealState.isExpanded, let panel, panel.isVisible, let anchor, let layout = currentLayout else { return }
@@ -954,13 +910,13 @@ final class NotchController {
         let margin = HoverCardView.shadowMargin
         let frame = card.insetBy(dx: -margin, dy: -margin)
         cardFrame = card
-        let host = NSHostingView(rootView: HoverCardView(reveal: cardReveal, placement: anchor, content: content))
+        let host = NSHostingView(rootView: HoverCardView(content: content))
         host.sizingOptions = []
         host.frame = NSRect(origin: .zero, size: frame.size)
         // Already out, for another ring: it travels rather than being dismissed and
         // put back. The size is taken at once and only the position is animated,
         // because a window resizing under a card makes the card reflow the whole way.
-        let travelling = detail?.isVisible == true && cardReveal.isExpanded
+        let travelling = detail?.isVisible == true && cardShowing
         if detail == nil { detail = makeDetailPanel(frame: frame) }
         guard let detail else { return }
         detail.contentView = host
@@ -972,15 +928,7 @@ final class NotchController {
             detail.setFrame(frame, display: true)
         }
         detail.orderFrontRegardless()
-        guard !travelling else { return }
-        // Held back a turn on purpose. Set in the same pass that installs the view,
-        // the change would land before anything had been drawn and the card would
-        // simply be there, at full size, with nothing to animate from.
-        cardReveal.isExpanded = false
-        DispatchQueue.main.async { [weak self] in
-            guard let self, self.detail?.isVisible == true else { return }
-            self.cardReveal.isExpanded = true
-        }
+        cardShowing = true
     }
 
     private func scheduleHide() {
@@ -994,16 +942,12 @@ final class NotchController {
     /// display change — where watching it retract from a position that no longer
     /// exists would be worse than it going.
     private func hideDetail(animated: Bool) {
-        hideWork?.cancel(); dismissWork?.cancel(); cardAnimator.stop()
-        let wasShowing = cardReveal.isExpanded
-        cardReveal.isExpanded = false
+        hideWork?.cancel(); cardAnimator.stop()
+        cardShowing = false
         cardFrame = nil
-        guard animated, wasShowing, !reduceMotion, detail?.isVisible == true else {
-            detail?.orderOut(nil); return
-        }
-        let work = DispatchWorkItem { [weak self] in self?.detail?.orderOut(nil) }
-        dismissWork = work
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.14, execute: work)
+        // Straight out. The delay here was the length of the retract animation, and
+        // with nothing to retract it is a card that stays on screen after it is gone.
+        detail?.orderOut(nil)
     }
     private func openUsage(_ tool: TrackedTool) {
         guard let provider = tool.builtin else { return }

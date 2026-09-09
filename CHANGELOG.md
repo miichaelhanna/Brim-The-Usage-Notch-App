@@ -2,6 +2,14 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## Unreleased
+
+- **The hover card no longer grows out of the notch.** It appeared, scaled up from the
+  side facing the notch and starting a little way inside it, so that the notch read as
+  the thing that had produced it. It is now simply there, at full size, where it is.
+  Moving between rings still slides it across; that is a separate motion and is
+  untouched.
+
 ## 1.4.1 (2026-09-09)
 
 - **The first-run footer said `^[3 tool](inflect: true) connected.`** That is automatic

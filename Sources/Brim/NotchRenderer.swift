@@ -23,9 +23,8 @@ enum NotchRenderer {
         // The hover card is part of the notch's surface and has the same problem, and
         // is captured in the wrapper it ships in: the shadow is drawn by the card
         // itself now, so a bare `HoverDetailView` is no longer what anyone sees.
-        write(AnyView(HoverCardView(reveal: NotchRevealModel(isExpanded: true), placement: .right,
-                                    content: HoverDetailView(store: store, tool: TrackedTool(.claude),
-                                                             hover: { _ in }, connect: {}, openUsage: {}))),
+        write(AnyView(HoverCardView(content: HoverDetailView(store: store, tool: TrackedTool(.claude),
+                                                            hover: { _ in }, connect: {}, openUsage: {}))),
               to: folder.appendingPathComponent("notch-card.png"))
         print("Rendered notch states into \(folder.path)")
     }
