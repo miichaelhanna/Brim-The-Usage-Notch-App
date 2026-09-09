@@ -2,6 +2,49 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## 1.4.0 (2026-09-09)
+
+Claude connects on Macs where it previously could not, and says what happened on the
+ones where it still can't.
+
+### Claude
+
+- **A login Claude Code kept in a file rather than the Keychain is now found.** Claude
+  Code falls back to `~/.claude/.credentials.json` when it cannot use the Keychain, and
+  Brim only ever looked in the Keychain. Someone signed into Claude Code on such a Mac
+  was told there was no Claude Code login on it, and no macOS permission dialog appeared
+  either — there was no secret to ask permission for — so the app looked broken rather
+  than mistaken.
+- **The Claude desktop app no longer counts as Claude Code.** They are different
+  products with different Keychain items, and only Claude Code's can read usage.
+  Detecting `/Applications/Claude.app` offered a Claude Code row, and a Connect button,
+  to people who had never installed Claude Code and for whom it could never work.
+- **Pressing Connect and finding nothing to read now says so.** That case used to send
+  the card back to the button that had just been pressed, with nothing written anywhere,
+  which is indistinguishable from a button that does nothing.
+- **A refused Keychain read says which refusal it was.** A permission declined once and
+  since remembered, a keychain macOS will not open a dialog for, and a login stored
+  beyond reach are three different problems with three different fixes, and they all
+  used to share one sentence. Each now names its own remedy.
+- **A silent refusal on one Keychain entry no longer ends the search.** Claude Code keeps
+  a base entry plus per-install siblings; only the newest was ever read, so one entry
+  macOS declined on its own hid every working one behind it. Answering a dialog with
+  Cancel still stops it, because that is a person saying no.
+- **Claude Code is found when installed by bun or Volta**, alongside the paths already
+  searched.
+
+### The Claude allowance
+
+- **It is named for what it covers**: Claude chat, Claude Code and Claude Design draw on
+  one allowance, which Anthropic meters together and does not break out. The ring used to
+  read as a Claude Code figure, which undersold it — it has always been the chat number
+  too.
+- **A per-surface breakdown will appear by itself if Anthropic ever publishes one.** Each
+  limit carries a `scope.surface`, and the reply carries per-surface siblings; both are
+  read now, and both are null on every account seen so far. Buckets that arrive under
+  internal code names are deliberately left alone: a ring labelled "Nimbus Quill" tells
+  nobody anything, and one of them reports 0 on a normal account.
+
 ## 1.3.0 (2026-09-09)
 
 The notch moves the way it always looked like it should, it stops hiding inside the
