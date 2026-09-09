@@ -2,7 +2,7 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
-## Unreleased
+## 1.4.2 (2026-09-09)
 
 - **The hover card no longer grows out of the notch.** It appeared, scaled up from the
   side facing the notch and starting a little way inside it, so that the notch read as

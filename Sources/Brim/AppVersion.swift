@@ -9,7 +9,7 @@ import Foundation
 /// the constant, which `Scripts/build.sh` checks against the `VERSION` file and
 /// refuses to package if they disagree.
 enum AppVersion {
-    static let fallback = "1.4.1"
+    static let fallback = "1.4.2"
     static var current: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? fallback
     }
