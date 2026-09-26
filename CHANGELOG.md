@@ -2,6 +2,26 @@
 
 Notable changes, newest first. Versions follow [semantic versioning](https://semver.org).
 
+## 1.4.3 (2026-09-27)
+
+- **"macOS refused the read and gave no reason beyond code 0" was never a refusal.**
+  Code 0 is macOS saying yes. Brim had been allowed to read Claude Code's login and
+  could not understand what it read, and reported that as a refusal, so Try Again read
+  the same thing and said the same thing forever. That case now says what it is, and
+  `--diagnose-claude` prints the login's layout, never its contents, so the format can
+  be supported.
+- **More ways of writing that login are understood**: an expiry that is missing, in
+  seconds rather than milliseconds, or written as text, and JSON stored as its own hex.
+- **Choosing Allow instead of Always Allow can now be undone.** Allow works, so the
+  slip goes unnoticed, and then macOS asks again every time Brim opens and whenever
+  Claude Code renews its login, with nothing in the app that could bring the dialog back
+  on purpose. Connections now has **Ask macOS Again** while live updates are on, which
+  reads the login afresh so macOS offers Always Allow again. If Always Allow was already
+  given, no dialog appears and it is simply a refresh.
+- **A refused Keychain read opens Keychain Access for you.** When macOS has remembered a
+  refusal, the only place to change it is Keychain Access, which macOS no longer puts
+  anywhere obvious. The card now has a button for it.
+
 ## 1.4.2 (2026-09-09)
 
 - **The hover card no longer grows out of the notch.** It appeared, scaled up from the
