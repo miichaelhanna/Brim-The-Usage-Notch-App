@@ -33,6 +33,9 @@ final class UsageStore: ObservableObject {
     @Published private(set) var claudeAccountUUID: String?
     /// Whether live Claude usage is working, so first run and Connections agree.
     @Published private(set) var liveClaude: LiveClaudeState = .off
+    /// Whether live Claude is reading Claude Code's login from the Keychain, which is
+    /// the only case where there is a macOS permission to get right.
+    @Published private(set) var claudeLoginInKeychain = false
     @Published var notice: String?
     @Published private(set) var placement: NotchAnchor?
     @Published private(set) var preferredPosition: NotchPosition?
@@ -199,6 +202,7 @@ final class UsageStore: ObservableObject {
             guard let self else { return }
             self.liveUnavailable = nil
             self.liveClaude = .on
+            self.claudeLoginInKeychain = self.claudeLive.readsKeychain
             self.applyClaude(snapshot)
             self.recordOutcome(.claudeCode, succeeded: true)
         }
@@ -589,7 +593,7 @@ final class UsageStore: ObservableObject {
             isRefreshing = false
         case .claudeCode:
             claudeSignIn.stop(); claudeLive.stop()
-            liveClaude = .off; liveUnavailable = nil
+            liveClaude = .off; liveUnavailable = nil; claudeLoginInKeychain = false
             renewal.reset(); lastRenewalCheck = nil
         case .perplexity:
             perplexity.reset()
@@ -666,6 +670,23 @@ final class UsageStore: ObservableObject {
         noteActivity()
         liveClaude = .checking
         claudeLive.refresh()
+    }
+
+    /// Makes macOS ask again whether Brim may read Claude Code's login.
+    ///
+    /// For someone who chose Allow when they meant Always Allow. Reading the login
+    /// afresh is what raises the dialog; if Always Allow was already given, no dialog
+    /// appears and this is simply a refresh.
+    func askKeychainAgain() {
+        guard isConnected(.claudeCode) else { return }
+        noteActivity()
+        liveClaude = .checking
+        claudeLive.askAgain()
+    }
+
+    /// Whether the live read failed because macOS would not hand over the login.
+    var claudeKeychainRefused: Bool {
+        if case .accessDenied = liveUnavailable { true } else { false }
     }
 
     /// Opens the folder the descriptions live in, creating and seeding it first.

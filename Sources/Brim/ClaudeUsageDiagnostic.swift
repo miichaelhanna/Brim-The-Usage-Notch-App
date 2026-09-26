@@ -59,6 +59,10 @@ enum ClaudeUsageDiagnostic {
             print("Keychain access was refused (OSStatus \(status)), so live usage is unavailable.")
             print("Meaning: \(ClaudeCredential.explain(status))")
             print("A dev build has no stable code identity; a signed build is granted access once.")
+        case .unrecognised(let shape):
+            print("Claude Code's login was read, and is in a form this version does not recognise.")
+            print("Its layout, keys and kinds of value only, no contents:")
+            print(shape.joined(separator: "\n"))
         case .expired(let when):
             print("Saved login expired \(when.formatted(.iso8601)). Claude Code renews it on next use.")
         case .found(let token):

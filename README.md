@@ -101,7 +101,8 @@ Claude Code already holds.
 
 There is nothing to paste and no second login. **Turn on live updates** in Connections,
 and macOS asks once whether Brim may read that saved login. Choose Always Allow and the
-numbers go live. Brim only ever reads it: it cannot expire, rotate or invalidate that
+numbers go live. Chose plain Allow by mistake? It works, but macOS then asks again
+every time Brim opens; press **Ask macOS Again** in Connections and choose Always Allow. Brim only ever reads it: it cannot expire, rotate or invalidate that
 login, so it cannot sign you out of Claude Code.
 
 Skip it if you like: Brim then reads nothing from Claude at all, and the same button is

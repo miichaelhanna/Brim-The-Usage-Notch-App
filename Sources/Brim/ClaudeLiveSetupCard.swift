@@ -43,6 +43,23 @@ struct ClaudeLiveSetupCard: View {
                  + "withdraw, in Keychain Access.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
+            if store.claudeLoginInKeychain { askAgain }
+        }
+    }
+
+    /// For someone who chose Allow when they meant Always Allow.
+    ///
+    /// Allow works, which is exactly why it goes unnoticed: the numbers go live, and the
+    /// dialog only returns the next time Brim opens or Claude Code renews its login. By
+    /// then there was nothing on screen that could bring it back on purpose.
+    private var askAgain: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Button("Ask macOS Again") { store.askKeychainAgain() }
+                .controlSize(.small)
+            Text("Chose Allow instead of Always Allow? macOS will keep asking each time Brim opens. "
+                 + "Press this and choose Always Allow. If you already did, no dialog appears.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         }
     }
 
@@ -85,12 +102,34 @@ struct ClaudeLiveSetupCard: View {
                     .font(.callout)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            if store.claudeKeychainRefused { keychainAccess }
             Text("A read that fails changes nothing at the other end. Brim only ever reads that login, "
                  + "so it cannot expire or invalidate it, and cannot sign you out of Claude Code.")
                 .font(.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             skipNote
         }
+    }
+
+    /// Try Again, on the row above, raises the dialog when macOS is still willing to
+    /// show it. When it has remembered a refusal, the only place left to change that
+    /// answer is Keychain Access, so this opens it rather than leaving the person to
+    /// find an app macOS no longer puts anywhere obvious.
+    private var keychainAccess: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Button("Open Keychain Access") { Self.openKeychainAccess() }
+                .controlSize(.small)
+            Text("Press Try Again and choose Always Allow. If no dialog appears, find "
+                 + "“Claude Code-credentials” in Keychain Access and add Brim on its Access Control tab.")
+                .font(.caption).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private static func openKeychainAccess() {
+        guard let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.keychainaccess")
+        else { return }
+        NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
     }
 
     private var skipNote: some View {

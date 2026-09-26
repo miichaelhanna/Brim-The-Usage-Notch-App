@@ -1,5 +1,6 @@
 import Foundation
 import Security
+import BrimCore
 
 /// Finds the credential that can read this account's Claude usage.
 ///
@@ -29,6 +30,9 @@ enum ClaudeCredential {
         let expiresAt: Date?
         let subscription: String?
         let isLongLived: Bool
+        /// The Keychain item this came from, or nil when it was read from Claude Code's
+        /// file. Only a Keychain read is something macOS asks permission for.
+        var keychainService: String? = nil
         func isValid(at now: Date = Date()) -> Bool { expiresAt.map { $0 > now } ?? true }
     }
 
@@ -39,6 +43,9 @@ enum ClaudeCredential {
         case missing
         /// The user declined the Keychain prompt, or macOS refused.
         case denied(OSStatus)
+        /// macOS handed the login over and it is in a form this version cannot read.
+        /// Carries its shape, keys and kinds only, for `--diagnose-claude`.
+        case unrecognised(shape: [String])
     }
 
     /// Reading is done in two phases, which matters for both permission and manners.
@@ -70,7 +77,11 @@ enum ClaudeCredential {
     static func look(now: Date = Date(), maximumReads: Int = 4) -> Lookup {
         let keychain = lookInKeychain(now: now, maximumReads: maximumReads)
         if case .found = keychain { return keychain }
-        guard let token = fileToken() else { return keychain }
+        guard let data = try? Data(contentsOf: credentialsFile) else { return keychain }
+        guard let token = parse(data) else {
+            if case .missing = keychain { return .unrecognised(shape: ClaudeLoginFormat.outline(data)) }
+            return keychain
+        }
         if token.isValid(at: now) { return .found(token) }
         // A stale file is still better evidence than a Keychain that held nothing:
         // it says a login exists and has lapsed, which is a different thing to fix.
@@ -113,6 +124,7 @@ enum ClaudeCredential {
 
         var tokens: [Token] = []
         var refusal: OSStatus?
+        var unrecognised: [String]?
         for item in matches.prefix(maximumReads) {
             guard let service = item[kSecAttrService as String] as? String else { continue }
             let query: [String: Any] = [
@@ -123,7 +135,18 @@ enum ClaudeCredential {
             ]
             var value: CFTypeRef?
             let read = SecItemCopyMatching(query as CFDictionary, &value)
-            if read == errSecSuccess, let data = value as? Data, let token = parse(data) {
+            // Read, and not understood. This used to fall through to the refusal
+            // below with the status it carried, which is errSecSuccess, so the app said
+            // macOS "refused the read and gave no reason beyond code 0" about a read
+            // macOS had allowed. Try Again then read the same thing and said the same.
+            if read == errSecSuccess, let data = value as? Data, parse(data) == nil {
+                // A read that succeeded ends the walk for the same reason as below:
+                // each further sibling may cost the person another dialog.
+                unrecognised = ClaudeLoginFormat.outline(data)
+                break
+            }
+            if read == errSecSuccess, let data = value as? Data, var token = parse(data) {
+                token.keychainService = service
                 // The newest valid one is enough; stop before prompting again.
                 if token.isValid(at: now) { return .found(token) }
                 tokens.append(token)
@@ -143,6 +166,7 @@ enum ClaudeCredential {
         }
 
         if let latest = tokens.compactMap(\.expiresAt).max() { return .expired(at: latest) }
+        if let unrecognised { return .unrecognised(shape: unrecognised) }
         if let refusal { return .denied(refusal) }
         return .missing
     }
@@ -192,13 +216,10 @@ enum ClaudeCredential {
     }
 
     static func parse(_ data: Data) -> Token? {
-        guard let root = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
-        let oauth = root["claudeAiOauth"] as? [String: Any] ?? root
-        guard let value = oauth["accessToken"] as? String, !value.isEmpty,
-              let milliseconds = oauth["expiresAt"] as? Double, milliseconds > 0 else { return nil }
-        return Token(value: value,
-                     expiresAt: Date(timeIntervalSince1970: milliseconds / 1000),
-                     subscription: oauth["subscriptionType"] as? String,
+        guard let login = ClaudeLoginFormat.parse(data) else { return nil }
+        return Token(value: login.accessToken,
+                     expiresAt: login.expiresAt,
+                     subscription: login.subscription,
                      isLongLived: false)
     }
 }

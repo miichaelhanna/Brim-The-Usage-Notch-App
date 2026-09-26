@@ -26,6 +26,7 @@ final class ClaudeLiveConnection {
         case noCredential
         case credentialExpired
         case accessDenied(OSStatus)
+        case unrecognisedLogin
         case rejected
         case network(String)
         case unreadable
@@ -48,6 +49,11 @@ final class ClaudeLiveConnection {
             case .accessDenied(let status):
                 "Brim wasn’t allowed to read Claude Code’s saved login, so it can’t fetch live "
                     + "usage: \(ClaudeCredential.explain(status))"
+            case .unrecognisedLogin:
+                "macOS let Brim read Claude Code’s saved login, but it is written in a form this "
+                    + "version of Brim doesn’t recognise, so it can’t be used. Nothing is wrong with "
+                    + "the permission. Running Brim with --diagnose-claude prints the login’s layout, "
+                    + "never its contents, which is what a fix needs."
             case .network(let detail):
                 "Couldn’t reach Anthropic for live usage: \(detail)"
             case .unreadable:
@@ -96,11 +102,26 @@ final class ClaudeLiveConnection {
         switch lookup {
         case .missing: deliver(.noCredential)
         case .denied(let status): deliver(.accessDenied(status))
+        case .unrecognised: deliver(.unrecognisedLogin)
         case .expired: cached = nil; deliver(.credentialExpired)
         case .found(let token):
             cached = token
             fetch(token)
         }
+    }
+
+    /// Whether the login in use came from the Keychain, the only source macOS asks about.
+    var readsKeychain: Bool { cached?.keychainService != nil }
+
+    /// Reads the login again even though one is already in hand, so that macOS asks.
+    ///
+    /// Choosing Allow rather than Always Allow works, once: the token is kept in memory,
+    /// so nothing asks again until Brim is next opened or Claude Code renews its login,
+    /// and then the dialog comes back every time. Without this, someone who noticed the
+    /// slip had no way to get the dialog back short of quitting the app.
+    func askAgain() {
+        cached = nil
+        refresh()
     }
 
     func stop() {
