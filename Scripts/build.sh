@@ -58,8 +58,12 @@ echo "==> Building $VERSION ($BUILD)"
 # Cross-compiling needs an SDK that is not always present, so this degrades the way
 # signing does: a native build still runs here, and the release path checks the result
 # rather than trusting it.
-BINARY=".build/apple/Products/Release/Brim"
-if ! swift build -c release --arch arm64 --arch x86_64 || [ ! -f "$BINARY" ]; then
+# Where a universal build lands has moved between toolchains (.build/apple, then
+# .build/out), so it is asked for rather than assumed. Assuming it made a successful
+# universal build look like a failed one, and the release refuse to ship.
+UNIVERSAL=(swift build -c release --arch arm64 --arch x86_64)
+if "${UNIVERSAL[@]}"; then BINARY="$("${UNIVERSAL[@]}" --show-bin-path)/Brim"; else BINARY=""; fi
+if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
     echo "    universal build unavailable; building for this Mac only" >&2
     swift build -c release
     BINARY=".build/release/Brim"
