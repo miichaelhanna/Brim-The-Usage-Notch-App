@@ -4,9 +4,6 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 
 ## 1.4.3 (2026-09-27)
 
-- **No more "LIMITING" label.** It marked the limit that would run out first, and read
-  as "you are being limited" at 12% used. That limit is still lifted onto its own
-  panel, and is still the number on the notch.
 - **Claude works for people who never open a terminal.** The Claude app keeps its
   sign-in private, so someone who only uses the app had nothing Brim could read and
   was told to go and use a command line. The Claude row now has **Sign In**: it installs
@@ -15,6 +12,9 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
   checksum and carries Anthropic's own signature; there is no script and no shell. The
   password is only ever typed on claude.ai, and Brim still stores no credential. Macs
   with only the Claude app now get a Claude row too.
+- **No more "LIMITING" label.** It marked the limit that would run out first, and read
+  as "you are being limited" at 12% used. That limit is still lifted onto its own
+  panel, and is still the number on the notch.
 - **"macOS refused the read and gave no reason beyond code 0" was never a refusal.**
   Code 0 is macOS saying yes. Brim had been allowed to read Claude Code's login and
   could not understand what it read, and reported that as a refusal, so Try Again read
@@ -23,10 +23,9 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
   be supported.
 - **A Claude Code entry with no Claude sign-in in it says so.** Used only inside the
   Claude desktop app, Claude Code keeps its connector logins in its Keychain entry and
-  no Claude sign-in, because the app holds that itself. Brim now says exactly that, and
-  that signing in once with the `claude` command line tool is the fix, rather than
-  calling it an unrecognised format. The diagnostic counts other logins and never names
-  them.
+  no Claude sign-in, because the app holds that itself. That is now offered as a Sign In
+  rather than reported as an unrecognised format. The diagnostic counts other logins
+  and never names them.
 - **More ways of writing that login are understood**: an expiry that is missing, in
   seconds rather than milliseconds, or written as text, and JSON stored as its own hex.
 - **Choosing Allow instead of Always Allow can now be undone.** Allow works, so the
