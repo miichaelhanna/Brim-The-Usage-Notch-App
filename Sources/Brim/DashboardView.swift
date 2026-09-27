@@ -267,6 +267,7 @@ struct DashboardView: View {
                 }
             }
             .font(.caption).foregroundStyle(.secondary)
+            .leadingFooter()
         }
     }
 }
@@ -385,6 +386,7 @@ struct ConnectionsView: View {
                  + "sign-in, which is the only place a password belongs. Subscription limits and API "
                  + "billing are separate, and Brim never substitutes one for the other.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
@@ -559,6 +561,7 @@ struct ConnectionsView: View {
         } footer: {
             Text("A description reads one local file. It never runs a command, makes a request, or "
                  + "touches a credential.")
+            .leadingFooter()
         }
     }
 
@@ -656,6 +659,7 @@ struct AppearanceView: View {
                  + "another one. The top edge hangs from the very top of the screen, and on a Mac with "
                  + "a notch it tucks into the hardware.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
@@ -697,6 +701,7 @@ struct AppearanceView: View {
                  + "the new size as you drag, so an edge that no longer has room for it will "
                  + "hand it to another one.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
@@ -732,6 +737,7 @@ struct AppearanceView: View {
             Text("Brim always lives in the menu bar, which is where usage and every control are, so "
                  + "the app can never go missing. The Dock icon is optional.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
@@ -751,6 +757,7 @@ struct AppearanceView: View {
                  : "The notch stays on your desktop, behind app windows. Collapsed, it shows a small "
                    + "edge until you hover it.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
@@ -778,6 +785,7 @@ struct AppearanceView: View {
             Text("Which rings the notch draws. Hiding one is display only: its usage is still "
                  + "read, and it stays in Usage. To stop reading a tool altogether, turn it off "
                  + "in Connections.")
+            .leadingFooter()
         }
     }
 
@@ -814,6 +822,7 @@ struct AppearanceView: View {
         } footer: {
             Text("Brim is only in the menu bar, so it has to be running to be there. "
                  + "Opening at login is how it comes back after a restart.\n\nBrim \(AppVersion.current)")
+            .leadingFooter()
         }
         // The state lives in System Settings, where it can change while this window is
         // open, so it is read again rather than remembered from when the view was made.
@@ -880,6 +889,7 @@ struct RoadmapView: View {
                      + "same number. Perplexity is a count rather than a ring: it reports what is left "
                      + "and never the allowance, so there is no proportion to draw.")
                     .fixedSize(horizontal: false, vertical: true)
+                .leadingFooter()
             }
 
             Section {

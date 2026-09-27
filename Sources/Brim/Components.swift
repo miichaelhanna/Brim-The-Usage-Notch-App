@@ -213,3 +213,13 @@ extension View {
             .shadow(color: Color.black.opacity(0.05), radius: 10, y: 2)
     }
 }
+
+extension View {
+    /// A grouped form on macOS right-aligns its section footers, so a paragraph of
+    /// explanation came out ragged-left under a form whose every other line starts at
+    /// the left edge. Every footer in the app is prose, so every footer takes this.
+    func leadingFooter() -> some View {
+        multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}

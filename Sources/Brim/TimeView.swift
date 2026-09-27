@@ -85,6 +85,7 @@ struct TimeView: View {
                 Spacer()
             }
             .font(.caption).foregroundStyle(.secondary)
+            .leadingFooter()
         }
     }
 
@@ -200,6 +201,7 @@ struct TimeView: View {
                  + "time away, not time working. Two sessions running at once are one hour of "
                  + "that tool's day, not two.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
@@ -218,6 +220,7 @@ struct TimeView: View {
                  + "Claude and ChatGPT used in a browser cannot appear here: no provider reports "
                  + "time, and those leave nothing on this Mac.")
                 .fixedSize(horizontal: false, vertical: true)
+            .leadingFooter()
         }
     }
 
