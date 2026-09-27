@@ -7,6 +7,15 @@ import BrimCore
 /// nothing, and touches no credential.
 enum ClaudeUsageDiagnostic {
     static func run() {
+        checkCache()
+        // Always, whatever the cache said. The cache and the live read are separate
+        // sources, and a Mac with no cache is exactly where the live read matters: this
+        // used to stop at "no cachedUsageUtilization block yet" and never say anything
+        // about the login.
+        checkLive()
+    }
+
+    private static func checkCache() {
         let path = AppPaths.claudeConfig
         print("Source: \(path.path)")
         guard let data = try? Data(contentsOf: path) else {
@@ -37,7 +46,6 @@ enum ClaudeUsageDiagnostic {
         } catch {
             print("Could not parse: \(error.localizedDescription)")
         }
-        checkLive()
     }
 
     /// Reports whether live usage is reachable. macOS asks the user before letting
