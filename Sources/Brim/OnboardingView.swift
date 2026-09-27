@@ -173,7 +173,7 @@ struct OnboardingView: View {
             Spacer(minLength: 10)
             switch state.status {
             case .checking: ProgressView().controlSize(.small)
-            case .needsSignIn: Button("Sign In") { store.connect(tool) }
+            case .needsSignIn: Button("Sign In") { store.signIn(tool) }
             case .problem: Button("Try Again") { store.connect(tool) }
             // The switch says what will happen; the tick says it already has. Without
             // it, on and off differ only by the position of a small grey control.

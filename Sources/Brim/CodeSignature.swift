@@ -62,13 +62,24 @@ enum CodeSignature {
         return Identity(size: size, modified: modified, fileNumber: fileNumber)
     }
 
-    private static func verify(_ path: String) -> Bool {
+    /// True when the binary is signed by one particular Developer ID team, and not
+    /// merely by someone Apple has issued an identity to.
+    ///
+    /// For what Brim downloads itself rather than finds: there the question is not "is
+    /// this plausibly a real build" but "is this the file its publisher shipped", and
+    /// only that publisher's own team answers it. Not cached, since it is asked once,
+    /// of a file nobody else has had a chance to touch.
+    static func isSigned(byTeam team: String, _ path: String) -> Bool {
+        verify(path, requirement: "anchor apple generic and certificate leaf[subject.OU] = \"\(team)\"")
+    }
+
+    private static func verify(_ path: String, requirement text: String = "anchor apple generic") -> Bool {
         var staticCode: SecStaticCode?
         guard SecStaticCodeCreateWithPath(URL(fileURLWithPath: path) as CFURL, [], &staticCode) == errSecSuccess,
               let staticCode else { return false }
 
         var requirement: SecRequirement?
-        guard SecRequirementCreateWithString("anchor apple generic" as CFString, [], &requirement) == errSecSuccess,
+        guard SecRequirementCreateWithString(text as CFString, [], &requirement) == errSecSuccess,
               let requirement else { return false }
 
         return SecStaticCodeCheckValidity(staticCode, [], requirement) == errSecSuccess

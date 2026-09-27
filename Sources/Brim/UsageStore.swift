@@ -36,6 +36,8 @@ final class UsageStore: ObservableObject {
     /// Whether live Claude is reading Claude Code's login from the Keychain, which is
     /// the only case where there is a macOS permission to get right.
     @Published private(set) var claudeLoginInKeychain = false
+    /// Where installing and signing in to Claude Code for someone has got to.
+    @Published private(set) var claudeSetupStep: ClaudeSetup.Step = .idle
     @Published var notice: String?
     @Published private(set) var placement: NotchAnchor?
     @Published private(set) var preferredPosition: NotchPosition?
@@ -82,6 +84,7 @@ final class UsageStore: ObservableObject {
     private let claudeSignIn = ClaudeSignInConnection()
     private let claudeReader = ClaudeUsageReader()
     private let claudeLive = ClaudeLiveConnection()
+    private let claudeSetup = ClaudeSetup()
     /// Watches for Claude Code writing a new login while the one Brim read has lapsed.
     private var renewal = CredentialRenewal()
     private var lastRenewalCheck: Date?
@@ -197,6 +200,16 @@ final class UsageStore: ObservableObject {
         claudeReader.onReading = { [weak self] reading in
             self?.claudeAccountUUID = reading.accountUUID
             self?.applyClaude(reading.snapshot)
+        }
+        claudeSetup.onStep = { [weak self] step in self?.claudeSetupStep = step }
+        claudeSetup.onSignedIn = { [weak self] in
+            guard let self else { return }
+            // The new sign-in is in Claude Code's Keychain entry now. Reading it is the
+            // one moment macOS asks, which is exactly when the person is looking.
+            self.liveUnavailable = nil
+            self.claudeSignIn.refresh()
+            self.liveClaude = .checking
+            self.claudeLive.askAgain()
         }
         claudeLive.onSnapshot = { [weak self] snapshot in
             guard let self else { return }
@@ -592,7 +605,7 @@ final class UsageStore: ObservableObject {
             codex.stop()
             isRefreshing = false
         case .claudeCode:
-            claudeSignIn.stop(); claudeLive.stop()
+            claudeSignIn.stop(); claudeLive.stop(); claudeSetup.cancel()
             liveClaude = .off; liveUnavailable = nil; claudeLoginInKeychain = false
             renewal.reset(); lastRenewalCheck = nil
         case .perplexity:
@@ -683,6 +696,28 @@ final class UsageStore: ObservableObject {
         liveClaude = .checking
         claudeLive.askAgain()
     }
+
+    /// Whether there is simply no Claude sign-in to read, which Brim can set up.
+    var claudeNeedsSignIn: Bool {
+        switch liveUnavailable {
+        case .noClaudeSignIn, .noCredential: true
+        default: false
+        }
+    }
+
+    /// The Sign In button. For Claude, that means installing Claude Code if needed and
+    /// running its own sign-in, so that someone who only uses the Claude app never has
+    /// to open a terminal. Everyone else's sign-in is what Connect already starts.
+    func signIn(_ tool: KnownTool) {
+        guard tool == .claudeCode else { return connect(tool) }
+        noteActivity()
+        connectedTools.insert(tool.rawValue)
+        claudeSetup.start()
+    }
+
+    func cancelClaudeSetup() { claudeSetup.cancel() }
+    func submitClaudeCode(_ code: String) { claudeSetup.submit(code: code) }
+    func openClaudeSignInLink() { claudeSetup.openLink() }
 
     /// Whether the live read failed because macOS would not hand over the login.
     var claudeKeychainRefused: Bool {

@@ -410,7 +410,7 @@ struct ConnectionsView: View {
             Spacer(minLength: 10)
             switch state.status {
             case .checking: ProgressView().controlSize(.small)
-            case .needsSignIn: Button("Sign In") { store.connect(tool) }
+            case .needsSignIn: Button("Sign In") { store.signIn(tool) }
             case .problem: Button("Try Again") { store.connect(tool) }
             case .connected: Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
             case .off: EmptyView()

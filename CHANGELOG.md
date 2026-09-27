@@ -4,6 +4,14 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 
 ## 1.4.3 (2026-09-27)
 
+- **Claude works for people who never open a terminal.** The Claude app keeps its
+  sign-in private, so someone who only uses the app had nothing Brim could read and
+  was told to go and use a command line. The Claude row now has **Sign In**: it installs
+  Claude Code from Anthropic if it isn't there, then opens claude.ai to sign in, and
+  Brim goes live by itself. The download is run only if it matches Anthropic's published
+  checksum and carries Anthropic's own signature; there is no script and no shell. The
+  password is only ever typed on claude.ai, and Brim still stores no credential. Macs
+  with only the Claude app now get a Claude row too.
 - **"macOS refused the read and gave no reason beyond code 0" was never a refusal.**
   Code 0 is macOS saying yes. Brim had been allowed to read Claude Code's login and
   could not understand what it read, and reported that as a refusal, so Try Again read

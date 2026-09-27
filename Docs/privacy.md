@@ -10,6 +10,8 @@ If anything here is wrong, that's a bug. Please open an issue.
 - **No analytics, telemetry, crash reporting, accounts, or server.** There is nothing
   to opt out of because there is nothing collecting.
 - **One outbound request type**, to `api.anthropic.com`, for your own Claude usage.
+  The one exception is Sign In for Claude on a Mac without Claude Code, which downloads
+  it from Anthropic's `downloads.claude.ai`; see [Signing in for you](#signing-in-for-you).
 - **No conversation content is ever read.** Not prompts, not responses, not transcripts.
   Only quota percentages and reset times.
 - **Brim holds no credential of its own.** It reads the ones the tools you already use
@@ -83,3 +85,22 @@ command in `~/.claude/settings.json` to capture usage from terminal sessions. Th
 intrusive, only worked from a terminal, and mutated a file belonging to another tool.
 It is gone. The app now detects and removes it on launch, restoring your original
 status line from the backup it saved.
+
+## Signing in for you
+
+Someone who only uses the Claude app has no sign-in Brim can read: the app keeps its
+own private. **Sign In** on the Claude row fixes that without a terminal, and only when
+pressed:
+
+1. If no Claude Code signed by Anthropic is installed, Brim downloads the latest build
+   from `downloads.claude.ai`, the same files Anthropic's own installer fetches. It is
+   run only if its SHA-256 matches Anthropic's published manifest **and** it is signed
+   by Anthropic's Developer ID team (`Q6L2SF6YDW`). It then installs itself into
+   `~/.local`, as it would from the installer. No admin rights, no script, no shell.
+2. Brim runs Claude Code's own `claude auth login`, which opens claude.ai in your
+   browser. Your password is typed there, never into Brim.
+3. The sign-in lands in Claude Code's Keychain entry, and is read from there exactly as
+   in the table above. Brim still stores no credential of its own.
+
+Brim never signs in to Anthropic by itself and never touches the Claude app's sign-in.
+

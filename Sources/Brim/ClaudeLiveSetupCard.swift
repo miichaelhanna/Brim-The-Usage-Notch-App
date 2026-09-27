@@ -16,11 +16,17 @@ struct ClaudeLiveSetupCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 13) {
-            switch store.liveClaude {
+            if store.claudeSetupStep != .idle {
+                ClaudeSetupProgress(store: store)
+            } else if store.claudeNeedsSignIn {
+                signInOffer
+            } else {
+                switch store.liveClaude {
             case .on: connected
             case .checking: checking
             case .off: offered
             case .problem: problem
+            }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -132,9 +138,77 @@ struct ClaudeLiveSetupCard: View {
         NSWorkspace.shared.openApplication(at: app, configuration: NSWorkspace.OpenConfiguration())
     }
 
+    /// What Sign In will do, said before it is pressed, because it installs something.
+    private var signInOffer: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Your Claude usage is read with Claude Code’s sign-in. The Claude app keeps its own "
+                 + "sign-in private, so Brim can’t use that one. Sign In, above, sets this up for you: it "
+                 + "installs Claude Code from Anthropic if it isn’t here yet, then opens claude.ai so you "
+                 + "can sign in. You never need to open Terminal or Claude Code itself, and your password "
+                 + "is only ever typed on claude.ai.")
+                .font(.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            skipNote
+        }
+    }
+
     private var skipNote: some View {
         Text("Skip it and Brim reads nothing from Claude at all, which is a perfectly good answer.")
             .font(.caption).foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Installing and signing in, as it happens, with the two ways out of a stuck browser.
+private struct ClaudeSetupProgress: View {
+    @ObservedObject var store: UsageStore
+    @State private var code = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            switch store.claudeSetupStep {
+            case .installing:
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Installing Claude Code from Anthropic. This takes a minute the first time.")
+                        .font(.callout)
+                }
+                cancel
+            case .signingIn(let link):
+                HStack(spacing: 8) {
+                    ProgressView().controlSize(.small)
+                    Text("Sign in on the claude.ai page that just opened in your browser. Brim carries on "
+                         + "by itself when you’re done.")
+                        .font(.callout)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                if link != nil {
+                    Button("Browser didn’t open? Open the sign-in page") { store.openClaudeSignInLink() }
+                        .buttonStyle(.link)
+                }
+                HStack(spacing: 8) {
+                    TextField("If claude.ai shows you a code, paste it here", text: $code)
+                        .textFieldStyle(.roundedBorder)
+                        .onSubmit(send)
+                    Button("Continue", action: send).disabled(code.isEmpty)
+                }
+                cancel
+            case .failed(let message):
+                Text(message)
+                    .font(.callout).foregroundStyle(.orange)
+                    .fixedSize(horizontal: false, vertical: true)
+            case .idle:
+                EmptyView()
+            }
+        }
+    }
+
+    private var cancel: some View {
+        Button("Cancel") { store.cancelClaudeSetup() }.controlSize(.small)
+    }
+
+    private func send() {
+        store.submitClaudeCode(code)
+        code = ""
     }
 }

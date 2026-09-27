@@ -12,15 +12,8 @@ final class ClaudeSignInConnection {
     func refresh() {
         guard process == nil else { return }
         let home = FileManager.default.homeDirectoryForCurrentUser
-        let candidates = [home.appendingPathComponent(".local/bin/claude").path,
-                          "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
-        // The same rule the `codex` binary is held to. All three of these directories are
-        // writable without admin rights, so a file planted under the right name would
-        // otherwise be run on every refresh. Anthropic's own build is Developer ID signed
-        // with the hardened runtime and passes; anything unsigned is left alone.
-        guard let executable = candidates.first(where: {
-            FileManager.default.isExecutableFile(atPath: $0) && CodeSignature.isAppleAnchored($0)
-        }) else {
+        // Held to the same rule as the `codex` binary, see ClaudeSetup.findExecutable.
+        guard let executable = ClaudeSetup.findExecutable() else {
             onSignIn?([]); return
         }
         let process = Process(), output = Pipe()

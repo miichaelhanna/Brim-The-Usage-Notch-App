@@ -105,6 +105,12 @@ numbers go live. Chose plain Allow by mistake? It works, but macOS then asks aga
 every time Brim opens; press **Ask macOS Again** in Connections and choose Always Allow. Brim only ever reads it: it cannot expire, rotate or invalidate that
 login, so it cannot sign you out of Claude Code.
 
+**Only use the Claude app, never the command line?** Press **Sign In** on the Claude row.
+The Claude app keeps its own sign-in private, so Brim uses Claude Code's instead, and
+sets that up for you: it installs Claude Code from Anthropic if it isn't there (checked
+against Anthropic's published checksum and signature before it runs), then opens
+claude.ai for you to sign in. No Terminal, and the password is only typed on claude.ai.
+
 Skip it if you like: Brim then reads nothing from Claude at all, and the same button is
 in Connections whenever you want it.
 
@@ -122,7 +128,9 @@ usage you asked for.**
 - Nothing is read until you connect that tool. Finding one on disk is a list, not
   permission, and nothing connects itself on launch.
 - No analytics, no telemetry, no crash reporting, no accounts, no server.
-- The only outbound requests are to `api.anthropic.com` for your Claude usage.
+- The only outbound requests are to `api.anthropic.com` for your Claude usage, and, only
+  if you press Sign In for Claude without Claude Code installed, to Anthropic's
+  `downloads.claude.ai` to install it.
 - Brim never handles your OpenAI credentials at all. It asks the ChatGPT app's
   own engine and reads back the numbers.
 - Brim stores no credential of its own. Live Claude usage is read from the login Claude

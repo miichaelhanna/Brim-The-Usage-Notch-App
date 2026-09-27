@@ -17,8 +17,9 @@ The whole attack surface, in one list:
 |---|---|
 | Read `~/.claude.json` | Read conversation content, prompts or transcripts |
 | Read Claude Code's Keychain item, and delete the one an earlier build of this app stored | Write to any other app's Keychain item |
-| One HTTPS request to `api.anthropic.com` | Contact any other host, ever |
-| Launch the `codex` and `claude` binaries, after verifying each one's signature | Run shell, evaluate strings, load plugins, or run unsigned code |
+| One HTTPS request to `api.anthropic.com` | Contact any other host, except the one below |
+| Download Claude Code from `downloads.claude.ai`, only when Sign In is pressed without it installed, and run it only if its SHA-256 matches Anthropic's manifest and it is signed by Anthropic's team `Q6L2SF6YDW` | Run a download that fails either check |
+| Launch the `codex` and `claude` binaries, after verifying each one's signature, including `claude auth login` when Sign In is pressed | Run shell, evaluate strings, load plugins, or run unsigned code |
 | Write to its own Application Support folder | Run a server, listen on a port, or accept input from the network |
 | Undo, once, the `statusLine` an earlier build wrote into `~/.claude/settings.json` | Write to any other app's files after that |
 
@@ -119,12 +120,13 @@ network call is in
 grep -rIoE 'https?://[a-zA-Z0-9.-]+' Sources | sort -u
 ```
 
-At the time of writing it returns exactly seven hosts:
+At the time of writing it returns exactly eight hosts:
 
 | Host | Why |
 |---|---|
-| `api.anthropic.com` | **The only host the app contacts.** Your Claude usage. |
-| `claude.ai`, `chatgpt.com` | Account pages *opened in your browser or the provider's desktop app* when you ask for a provider's own usage page. The app never requests these itself. |
+| `api.anthropic.com` | **The host the app contacts.** Your Claude usage. |
+| `downloads.claude.ai` | Claude Code itself, fetched only when you press Sign In for Claude and it is not installed. Checksum and signature verified before it runs. |
+| `claude.ai`, `chatgpt.com`, `www.perplexity.ai` | Account pages *opened in your browser or the provider's desktop app* when you ask for a provider's own usage page. The app never requests these itself. |
 | `github.com` | This repository, opened in your browser from the Add a tool card. |
 | `learn.chatgpt.com`, `simpleicons.org` | Documentation links in source comments. Not requests. |
 

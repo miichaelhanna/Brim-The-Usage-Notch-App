@@ -40,12 +40,13 @@ enum KnownTool: String, CaseIterable, Identifiable {
         let home = Self.home.path
         switch self {
         case .claudeCode:
-            // Claude Code, and only Claude Code. `/Applications/Claude.app` is the
-            // Claude desktop app, which is a different product: it stores a different
-            // Keychain item, and that item cannot read usage. Counting it here offered
-            // a Claude Code row to people who had never installed Claude Code, whose
-            // Connect button could only ever do nothing, silently.
+            // Claude Code, or the Claude desktop app. The app keeps its own sign-in
+            // private, so on its own it leaves nothing Brim can read, and it was once left
+            // out for that reason: its Connect button could only ever do nothing. It no
+            // longer does nothing. Sign In installs Claude Code and runs its sign-in, so
+            // someone with only the app is one button away, not off the list.
             return ["\(home)/.claude.json", "\(home)/.claude", "\(home)/.local/bin/claude",
+                    "/Applications/Claude.app", "\(home)/Applications/Claude.app",
                     "\(home)/.bun/bin/claude", "\(home)/.volta/bin/claude",
                     "/opt/homebrew/bin/claude", "/usr/local/bin/claude"]
         case .codex:
@@ -107,6 +108,17 @@ extension KnownTool {
         }
         switch self {
         case .claudeCode:
+            switch store.claudeSetupStep {
+            case .installing:
+                return ToolConnection(status: .checking,
+                                      detail: "Setting up Claude’s sign-in on this Mac. This takes a minute the first time…")
+            case .signingIn:
+                return ToolConnection(status: .checking,
+                                      detail: "Waiting for you to sign in to Claude in your browser…")
+            case .failed(let message):
+                return ToolConnection(status: .needsSignIn, detail: message)
+            case .idle: break
+            }
             if let error = store.errors[.claudeCode] { return ToolConnection(status: .problem, detail: error) }
             if store.liveClaude == .on {
                 return ToolConnection(status: .connected, detail: "Live · one allowance for Claude chat, Claude Code and Claude Design")
@@ -119,6 +131,13 @@ extension KnownTool {
             // Reporting the cache instead left this row green and reassuring directly
             // above the orange sentence saying the login had lapsed, and told first run,
             // which has no such sentence, nothing at all.
+            // Nothing to read is not a fault, it is a sign-in Brim can start, so it gets
+            // the Sign In button rather than an orange paragraph about Keychain entries.
+            if store.claudeNeedsSignIn {
+                return ToolConnection(status: .needsSignIn,
+                                      detail: "Sign in to Claude to see your allowance. You only sign in "
+                                      + "on claude.ai; Brim sets up the rest.")
+            }
             if case .problem(let message) = store.liveClaude {
                 return ToolConnection(status: .problem, detail: message)
             }
@@ -128,8 +147,8 @@ extension KnownTool {
                                       + "Allow the live read for current numbers.")
             }
             return ToolConnection(status: .needsSignIn,
-                                  detail: "Sign in with Claude Code to read your allowance. It is what "
-                                  + "holds the login Brim reads; the Claude app alone leaves none.")
+                                  detail: "Sign in to Claude to see your allowance. You only sign in "
+                                  + "on claude.ai; Brim sets up the rest.")
         case .codex:
             if let error = store.errors[.codex] { return ToolConnection(status: .problem, detail: error) }
             if store.signedInProviders.contains(.codex) {
