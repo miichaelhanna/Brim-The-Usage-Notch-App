@@ -49,4 +49,20 @@ final class ClaudeLoginFormatTests: XCTestCase {
         XCTAssertNil(ClaudeLoginFormat.parse(data(#"{"claudeAiOauth":{"accessToken":""}}"#)))
         XCTAssertNil(ClaudeLoginFormat.parse(data("not json and not hex")))
     }
+
+    /// What Claude Code leaves when it only runs inside the Claude desktop app: its
+    /// connector logins, and no Claude sign-in. That is no login, not a new format.
+    func testAnEntryWithOnlyConnectorLoginsHoldsNoClaudeLogin() {
+        let json = #"{"mcpOAuth":{"plugin:slack|abc":{"accessToken":"x","serverName":"slack"}}}"#
+        XCTAssertNil(ClaudeLoginFormat.parse(data(json)))
+        XCTAssertTrue(ClaudeLoginFormat.holdsNoClaudeLogin(data(json)))
+        XCTAssertEqual(ClaudeLoginFormat.outline(data(json)), ["  mcpOAuth: object of 1"],
+                       "other logins are counted, never named")
+    }
+
+    func testABrokenClaudeLoginIsNotMistakenForAnAbsentOne() {
+        let json = #"{"claudeAiOauth":{"token":"x"}}"#
+        XCTAssertFalse(ClaudeLoginFormat.holdsNoClaudeLogin(data(json)))
+        XCTAssertEqual(ClaudeLoginFormat.outline(data(json)), ["  claudeAiOauth.token: string"])
+    }
 }

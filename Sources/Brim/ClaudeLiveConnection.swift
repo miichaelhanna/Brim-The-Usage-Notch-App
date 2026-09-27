@@ -27,6 +27,7 @@ final class ClaudeLiveConnection {
         case credentialExpired
         case accessDenied(OSStatus)
         case unrecognisedLogin
+        case noClaudeSignIn
         case rejected
         case network(String)
         case unreadable
@@ -54,6 +55,12 @@ final class ClaudeLiveConnection {
                     + "version of Brim doesn’t recognise, so it can’t be used. Nothing is wrong with "
                     + "the permission. Running Brim with --diagnose-claude prints the login’s layout, "
                     + "never its contents, which is what a fix needs."
+            case .noClaudeSignIn:
+                "Claude Code’s saved entry on this Mac holds only its connector logins, not a "
+                    + "Claude sign-in. That is what Claude Code leaves when it is only used inside the "
+                    + "Claude desktop app, which keeps its sign-in to itself. Install the Claude Code "
+                    + "command line tool and sign in once, with `claude` then /login, and Brim goes "
+                    + "live by itself."
             case .network(let detail):
                 "Couldn’t reach Anthropic for live usage: \(detail)"
             case .unreadable:
@@ -103,6 +110,7 @@ final class ClaudeLiveConnection {
         case .missing: deliver(.noCredential)
         case .denied(let status): deliver(.accessDenied(status))
         case .unrecognised: deliver(.unrecognisedLogin)
+        case .noClaudeSignIn: deliver(.noClaudeSignIn)
         case .expired: cached = nil; deliver(.credentialExpired)
         case .found(let token):
             cached = token

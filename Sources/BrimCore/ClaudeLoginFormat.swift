@@ -28,6 +28,17 @@ public enum ClaudeLoginFormat {
                      subscription: oauth["subscriptionType"] as? String)
     }
 
+    /// Whether this is Claude Code's entry holding other logins but no Claude sign-in.
+    ///
+    /// The same Keychain entry carries Claude Code's connector (MCP) logins under
+    /// `mcpOAuth`. Where Claude Code is only used inside the Claude desktop app, that is
+    /// all it carries: the app keeps the Claude sign-in itself. Such an entry is not a
+    /// login in a new format, it is no login, and it has a different fix.
+    public static func holdsNoClaudeLogin(_ data: Data) -> Bool {
+        guard let root = object(from: data), parse(data) == nil else { return false }
+        return root["claudeAiOauth"] == nil
+    }
+
     /// The JSON, whether it was stored as itself or as the hex of itself. The
     /// `security` tool writes and prints non-text payloads as hex, and an install that
     /// saved its login through it can leave exactly that behind.
@@ -88,14 +99,22 @@ public enum ClaudeLoginFormat {
             let text = String(data: data, encoding: .utf8) != nil ? "text" : "binary"
             return ["  (not JSON: \(data.count) bytes of \(text))"]
         }
-        return outline(root, path: "")
+        // Only the Claude login is laid out in full. Everything else in this entry is
+        // someone's other logins, and their names are nobody's business: a count says
+        // they are there, which is all a fix needs.
+        return root.keys.sorted().flatMap { key -> [String] in
+            let value = root[key]!
+            if key == "claudeAiOauth" { return outline(value, path: key) }
+            if let object = value as? [String: Any] { return ["  \(key): object of \(object.count)"] }
+            return outline(value, path: key)
+        }
     }
 
     private static func outline(_ value: Any, path: String) -> [String] {
         switch value {
         case let dictionary as [String: Any]:
             return dictionary.keys.sorted().flatMap { key in
-                outline(dictionary[key]!, path: path.isEmpty ? key : "\(path).\(key)")
+                outline(dictionary[key]!, path: "\(path).\(key)")
             }
         case let array as [Any]: return ["  \(path): array of \(array.count)"]
         case is NSNull: return ["  \(path): null"]

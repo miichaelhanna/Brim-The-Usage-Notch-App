@@ -67,6 +67,11 @@ enum ClaudeUsageDiagnostic {
             print("Keychain access was refused (OSStatus \(status)), so live usage is unavailable.")
             print("Meaning: \(ClaudeCredential.explain(status))")
             print("A dev build has no stable code identity; a signed build is granted access once.")
+        case .noClaudeSignIn:
+            print("Claude Code's Keychain entry was read. It holds connector (MCP) logins only,")
+            print("and no Claude sign-in (no claudeAiOauth), so there is nothing to read usage with.")
+            print("This is what Claude Code leaves when it only runs inside the Claude desktop app.")
+            print("Fix: install the Claude Code command line tool and sign in once (`claude`, /login).")
         case .unrecognised(let shape):
             print("Claude Code's login was read, and is in a form this version does not recognise.")
             print("Its layout, keys and kinds of value only, no contents:")

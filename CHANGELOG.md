@@ -10,6 +10,12 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
   the same thing and said the same thing forever. That case now says what it is, and
   `--diagnose-claude` prints the login's layout, never its contents, so the format can
   be supported.
+- **A Claude Code entry with no Claude sign-in in it says so.** Used only inside the
+  Claude desktop app, Claude Code keeps its connector logins in its Keychain entry and
+  no Claude sign-in, because the app holds that itself. Brim now says exactly that, and
+  that signing in once with the `claude` command line tool is the fix, rather than
+  calling it an unrecognised format. The diagnostic counts other logins and never names
+  them.
 - **More ways of writing that login are understood**: an expiry that is missing, in
   seconds rather than milliseconds, or written as text, and JSON stored as its own hex.
 - **Choosing Allow instead of Always Allow can now be undone.** Allow works, so the

@@ -46,6 +46,9 @@ enum ClaudeCredential {
         /// macOS handed the login over and it is in a form this version cannot read.
         /// Carries its shape, keys and kinds only, for `--diagnose-claude`.
         case unrecognised(shape: [String])
+        /// Claude Code's entry exists and was read, and holds only its connector logins.
+        /// What Claude Code leaves when it only runs inside the Claude desktop app.
+        case noClaudeSignIn
     }
 
     /// Reading is done in two phases, which matters for both permission and manners.
@@ -125,6 +128,7 @@ enum ClaudeCredential {
         var tokens: [Token] = []
         var refusal: OSStatus?
         var unrecognised: [String]?
+        var sawEntryWithoutLogin = false
         for item in matches.prefix(maximumReads) {
             guard let service = item[kSecAttrService as String] as? String else { continue }
             let query: [String: Any] = [
@@ -139,6 +143,12 @@ enum ClaudeCredential {
             // below with the status it carried, which is errSecSuccess, so the app said
             // macOS "refused the read and gave no reason beyond code 0" about a read
             // macOS had allowed. Try Again then read the same thing and said the same.
+            if read == errSecSuccess, let data = value as? Data, ClaudeLoginFormat.holdsNoClaudeLogin(data) {
+                // Not the login, so the search goes on: a sibling may hold it. Capped by
+                // maximumReads like every other step of this walk.
+                sawEntryWithoutLogin = true
+                continue
+            }
             if read == errSecSuccess, let data = value as? Data, parse(data) == nil {
                 // A read that succeeded ends the walk for the same reason as below:
                 // each further sibling may cost the person another dialog.
@@ -167,6 +177,7 @@ enum ClaudeCredential {
 
         if let latest = tokens.compactMap(\.expiresAt).max() { return .expired(at: latest) }
         if let unrecognised { return .unrecognised(shape: unrecognised) }
+        if refusal == nil, sawEntryWithoutLogin { return .noClaudeSignIn }
         if let refusal { return .denied(refusal) }
         return .missing
     }
