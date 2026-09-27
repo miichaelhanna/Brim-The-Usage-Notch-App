@@ -146,7 +146,8 @@ struct StatusFlag: View {
 
 /// One usage window. The limiting window is drawn `emphasised` and lifted onto its
 /// own panel so the eye lands on the limit that actually applies, rather than on
-/// whichever row happens to be first.
+/// whichever row happens to be first. The panel is the whole signal: a "LIMITING" flag
+/// used to sit on it too, and read as "you are being limited" at 12% used.
 struct UsageBar: View {
     let window: UsageWindow
     let now: Date
@@ -158,7 +159,6 @@ struct UsageBar: View {
         VStack(alignment: .leading, spacing: 9) {
             HStack(spacing: 6) {
                 Text(window.title).font(.system(size: emphasised ? 14 : 13, weight: .medium))
-                if window.isActive { StatusFlag(text: "LIMITING", color: tint) }
                 if window.isEstimated { StatusFlag(text: "ESTIMATED", color: surface.muted) }
                 Spacer(minLength: 8)
                 Text(window.resetDescription(at: now)).font(.system(size: 11)).foregroundStyle(surface.muted)
@@ -185,7 +185,6 @@ struct UsageBar: View {
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(window.title), \(Int(window.usedPercent.rounded())) percent used"
-                            + (window.isActive ? ", currently limiting" : "")
                             + (window.isEstimated ? ", estimated" : ""))
     }
 }

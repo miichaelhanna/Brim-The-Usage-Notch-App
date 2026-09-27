@@ -288,7 +288,6 @@ struct UsageRow: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(spacing: 7) {
                 Text(window.title).font(emphasised ? .body.weight(.medium) : .body)
-                if window.isActive { StatusChip(text: "Limiting", tint: tint) }
                 if window.isEstimated { StatusChip(text: "Estimated") }
                 Spacer(minLength: 8)
                 Text("\(Int(window.usedPercent.rounded()))%")
@@ -311,7 +310,6 @@ struct UsageRow: View {
         .opacity(expired ? 0.55 : 1)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(window.title), \(Int(window.usedPercent.rounded())) percent used"
-                            + (window.isActive ? ", currently limiting" : "")
                             + (window.isEstimated ? ", estimated" : ""))
     }
 }

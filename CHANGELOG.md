@@ -4,6 +4,9 @@ Notable changes, newest first. Versions follow [semantic versioning](https://sem
 
 ## 1.4.3 (2026-09-27)
 
+- **No more "LIMITING" label.** It marked the limit that would run out first, and read
+  as "you are being limited" at 12% used. That limit is still lifted onto its own
+  panel, and is still the number on the notch.
 - **Claude works for people who never open a terminal.** The Claude app keeps its
   sign-in private, so someone who only uses the app had nothing Brim could read and
   was told to go and use a command line. The Claude row now has **Sign In**: it installs
