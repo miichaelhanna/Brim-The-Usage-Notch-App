@@ -40,11 +40,6 @@ public struct TrackedTool: Identifiable, Hashable, Sendable {
 
     public var isDescribed: Bool { builtin == nil }
 
-    /// The descriptor's own id, for a described tool.
-    public var descriptorID: String? {
-        isDescribed ? String(id.dropFirst(Self.describedPrefix.count)) : nil
-    }
-
     /// Stands in for a brand mark. A tool someone added has no logo the app can draw,
     /// and inventing one would be worse than initials that are obviously initials.
     public var monogram: String {

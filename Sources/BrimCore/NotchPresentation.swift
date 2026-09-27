@@ -73,9 +73,6 @@ public struct NotchRevealState {
 
     public func isPinned(at now: Date) -> Bool { pinnedUntil.map { now < $0 } ?? false }
 
-    /// Release the pin early.
-    public mutating func releasePin() { pinnedUntil = nil }
-
     @discardableResult
     public mutating func updatePointer(isInside: Bool, now: Date) -> Bool {
         guard collapseWhenIdle, isExpanded else { return false }

@@ -17,8 +17,6 @@ final class TrackedToolTests: XCTestCase {
     func testDescribedIdentitiesAreNamespacedAwayFromProviders() {
         let clash = TrackedTool(descriptor(id: "claude", name: "Not Claude"))
         XCTAssertNotEqual(clash.id, TrackedTool(.claude).id)
-        XCTAssertEqual(clash.descriptorID, "claude")
-        XCTAssertNil(TrackedTool(.claude).descriptorID)
     }
 
     func testProviderIdentitiesKeepTheirRawValues() {

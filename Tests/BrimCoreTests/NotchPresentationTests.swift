@@ -24,15 +24,6 @@ final class NotchPresentationTests: XCTestCase {
         XCTAssertFalse(state.isExpanded, "collapses once the pin expires")
     }
 
-    func testPinCanBeReleasedEarly() {
-        let start = Date(timeIntervalSince1970: 1_800_000_000)
-        var state = NotchRevealState(collapseWhenIdle: true)
-        state.reveal()
-        state.keepOpen(until: start.addingTimeInterval(300))
-        state.releasePin()
-        XCTAssertFalse(state.isPinned(at: start))
-    }
-
     private let now = Date(timeIntervalSince1970: 1_000)
 
     func testDesktopModeStaysBehindAppsAndBothModesStayBelowSystemBars() {

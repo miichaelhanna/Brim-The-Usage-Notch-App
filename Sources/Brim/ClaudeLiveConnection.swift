@@ -28,7 +28,6 @@ final class ClaudeLiveConnection {
         case accessDenied(OSStatus)
         case unrecognisedLogin
         case noClaudeSignIn
-        case rejected
         case network(String)
         case unreadable
 
@@ -44,9 +43,6 @@ final class ClaudeLiveConnection {
                 "Claude Code’s saved login has lapsed. Only Claude Code can renew it, and running "
                     + "the `claude` command once does: Brim sees the new login and goes live again "
                     + "by itself, within seconds."
-            case .rejected:
-                "Anthropic rejected Claude Code’s saved login. Signing in again with Claude Code "
-                    + "replaces it."
             case .accessDenied(let status):
                 "Brim wasn’t allowed to read Claude Code’s saved login, so it can’t fetch live "
                     + "usage: \(ClaudeCredential.explain(status))"
@@ -153,8 +149,7 @@ final class ClaudeLiveConnection {
                 let (data, response) = try await URLSession.shared.data(for: request)
                 // A reply from a superseded request must never overwrite a newer one.
                 guard let self, !Task.isCancelled, self.generation == generation else { return }
-                self.handle(data: data, status: (response as? HTTPURLResponse)?.statusCode ?? 0,
-                            longLived: token.isLongLived)
+                self.handle(data: data, status: (response as? HTTPURLResponse)?.statusCode ?? 0)
             } catch {
                 guard let self, !Task.isCancelled, self.generation == generation else { return }
                 self.deliver(.network(error.localizedDescription))
@@ -162,14 +157,14 @@ final class ClaudeLiveConnection {
         }
     }
 
-    private func handle(data: Data, status: Int, longLived: Bool) {
-        // A rejected long-lived token needs replacing; an expired short one only
-        // needs waiting out, so they must not share a message.
+    private func handle(data: Data, status: Int) {
+        // Claude Code's sign-in is short-lived, and a 401 means it has lapsed: Claude
+        // Code renews it the next time it runs, so this is waited out, not re-entered.
         guard status != 401 else {
             // A credential the server has now rejected must be re-read next time,
             // not reused, or the app would keep sending a dead one.
             cached = nil
-            return deliver(longLived ? .rejected : .credentialExpired)
+            return deliver(.credentialExpired)
         }
         guard (200..<300).contains(status) else {
             return deliver(.network("the server replied \(status)."))

@@ -25,11 +25,10 @@ enum ClaudeCredential {
 
     struct Token: Equatable {
         let value: String
-        /// Nil for a long-lived token, whose expiry this app does not track. The
-        /// server's reply decides validity rather than a local clock.
+        /// Nil when the saved login gives no expiry. The server's reply then decides
+        /// validity rather than a local clock.
         let expiresAt: Date?
         let subscription: String?
-        let isLongLived: Bool
         /// The Keychain item this came from, or nil when it was read from Claude Code's
         /// file. Only a Keychain read is something macOS asks permission for.
         var keychainService: String? = nil
@@ -230,7 +229,6 @@ enum ClaudeCredential {
         guard let login = ClaudeLoginFormat.parse(data) else { return nil }
         return Token(value: login.accessToken,
                      expiresAt: login.expiresAt,
-                     subscription: login.subscription,
-                     isLongLived: false)
+                     subscription: login.subscription)
     }
 }

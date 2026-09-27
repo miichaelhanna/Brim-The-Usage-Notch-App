@@ -49,7 +49,6 @@ Per-model limits appear only in `limits`. The sibling keys `seven_day_opus` and
 | "Cached" | Brim has not been allowed to read Claude Code's login yet. Turn on live updates in Connections and choose Always Allow. |
 | "Brim wasn't allowed to read…" | The Keychain prompt was declined. Try again, or allow Brim in Keychain Access. |
 | "Claude Code's saved login has lapsed" | It renews the next time Claude Code is used, and live usage resumes on its own. |
-| "Anthropic rejected Claude Code's saved login" | Sign in again with Claude Code. |
 | "No limits reported" | The account genuinely has none. Not an error. |
 
 ## ChatGPT · Codex
