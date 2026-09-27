@@ -56,11 +56,9 @@ final class ClaudeLiveConnection {
                     + "the permission. Running Brim with --diagnose-claude prints the login’s layout, "
                     + "never its contents, which is what a fix needs."
             case .noClaudeSignIn:
-                "Claude Code’s saved entry on this Mac holds only its connector logins, not a "
-                    + "Claude sign-in. That is what Claude Code leaves when it is only used inside the "
-                    + "Claude desktop app, which keeps its sign-in to itself. Install the Claude Code "
-                    + "command line tool and sign in once, with `claude` then /login, and Brim goes "
-                    + "live by itself."
+                "Claude Code isn’t signed in on this Mac yet. The Claude desktop app keeps its "
+                    + "own sign-in private, so Brim can’t use it. Sign in once in Terminal: run "
+                    + "claude, then type /login. Brim goes live by itself after that."
             case .network(let detail):
                 "Couldn’t reach Anthropic for live usage: \(detail)"
             case .unreadable:
